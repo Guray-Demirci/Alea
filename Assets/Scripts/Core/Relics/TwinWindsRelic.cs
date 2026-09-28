@@ -3,18 +3,18 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Relics
 {
     /// <summary>
-    /// A2 - Ikiz Ruzgarlar — KALICI.
-    /// "Attigin iki zarin farki sadece 1 ise, oyun bunu %50 ihtimalle cift sayar."
+    /// Twin Winds — PERMANENT.
+    /// "If your two dice differ by exactly 1, the game counts them as a double with a 50% chance."
     /// </summary>
     public class TwinWindsRelic : PermanentRelic
     {
         public override string ItemId => "relic_twin_winds";
-        public override string DisplayName => "İkiz Rüzgarlar";
+        public override string DisplayName => "Twin Winds";
         public override int Price => 400;
 
         public override int Priority => 500;
 
-        /// <summary>Denge ayari tek yerden degistirilir.</summary>
+        /// <summary>Balance knob, tuned in one place.</summary>
         private const float UpgradeChance = 0.5f;
 
         public override void ModifyRoll(DiceRoll roll, IRandomProvider random)
@@ -29,7 +29,7 @@ namespace Tavla.Core.Relics
             if (!random.Chance(UpgradeChance))
                 return;
 
-            // Buyuk olani baz aliyoruz: 5-4 -> 5-5 (oyuncu lehine).
+            // Use the higher die: 5-4 -> 5-5 (in the player's favour).
             int higher = roll.First > roll.Second ? roll.First : roll.Second;
             roll.Set(higher, higher);
         }

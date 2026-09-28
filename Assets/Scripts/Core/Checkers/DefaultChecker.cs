@@ -1,10 +1,10 @@
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// Klasik tavla pulu. Hicbir yetenek arayuzu uygulamaz — kurallarin "referans" davranisidir.
-    /// Ozel pullarin dogru calisip calismadigi hep bununla karsilastirilarak test edilir.
-    /// Ayrica Sisli Hane'ye giren her ozel pul, o hanede durdugu surece davranis olarak
-    /// tam olarak bu sinifa denk duser.
+    /// The classic backgammon checker. Implements no ability interface — it is the "reference" behaviour of the rules.
+    /// Special checkers are always tested against it.
+    /// Also, every special checker that enters a Fog Tile behaves exactly like this class
+    /// for as long as it stays there.
     /// </summary>
     public class DefaultChecker : BaseChecker
     {

@@ -1,19 +1,19 @@
 namespace Tavla.Core.Interfaces
 {
     /// <summary>
-    /// Magazadan satin alinabilen her sey (ozel tas, tuzak, board skini) bu arayuzu uygular.
-    /// DIKKAT: Burada "satin alindi mi?" bilgisi TUTULMAZ. O bilgi oyuncuya ait bir envanter/
-    /// repository katmaninin sorumlulugudur (SRP). Bu arayuz sadece "vitrin bilgisini" tanimlar.
+    /// Everything that can be bought in the shop (special checker, trap, board skin) implements this interface.
+    /// NOTE: "Has it been purchased?" is NOT stored here. That belongs to a player-owned
+    /// inventory/repository layer (SRP). This interface only describes the storefront data.
     /// </summary>
     public interface IPurchasable
     {
-        /// <summary>Kalici, benzersiz kimlik. Kayit/analitik/magaza eslestirmesi bunun uzerinden yapilir.</summary>
+        /// <summary>Stable, unique identifier. Save data, analytics and shop lookups use this value.</summary>
         string ItemId { get; }
 
-        /// <summary>UI'da gosterilecek isim. (Lokalizasyon anahtari da olabilir.)</summary>
+        /// <summary>Name shown in the UI (may also be used as a localization key).</summary>
         string DisplayName { get; }
 
-        /// <summary>Urunun fiyati. Para birimi tipi ileride ayri bir enum ile genisletilebilir.</summary>
+        /// <summary>Price of the item. The currency type may later be extended with a separate enum.</summary>
         int Price { get; }
     }
 }

@@ -2,7 +2,8 @@
     "name": "Tavla.View",
     "rootNamespace": "Tavla.View",
     "references": [
-        "Tavla.Core"
+        "Tavla.Core",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -11,6 +12,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "TAVLA_INPUT_SYSTEM_PACKAGE"
+        }
+    ],
     "noEngineReferences": false
 }

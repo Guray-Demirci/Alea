@@ -6,9 +6,9 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Acgozlu Pul. "Oyunda tek basina (acik olarak) kaldigi HER TUR icin ekstra altin uretir.
-    /// Risk: Rakip her an kirabilir."
-    /// Kendi konumunu bilmez; tur sonunda GameState hangi hanede oldugunu soyler.
+    /// Greedy Checker. "Produces extra gold for EVERY TURN it stays alone (as a blot) on the board.
+    /// Risk: the opponent can hit it at any moment."
+    /// It does not know its own position; GameState tells it which point it is on at the end of the turn.
     /// </summary>
     public class GreedyChecker : BaseChecker, ITurnEndReactor, IPermanent
     {
@@ -21,19 +21,19 @@ namespace Tavla.Core.Checkers
         {
             Node node = context.Board.Nodes[nodeIndex];
 
-            // "Acik" olmak = hanede yapayalniz durmak. Yanina biri gelirse uretim durur.
-            if (node.StoneCount != 1)
+            // Being a "blot" = standing completely alone on the point. Production stops once someone joins it.
+            if (node.CheckerCount != 1)
                 return;
 
             context.AddGold(OwnerId, GoldPerTurn);
-            context.Board.ReportAbility("GreedyIncome", this, nodeIndex);
+            context.Board.ReportAbility(AbilityIds.GreedyIncome, this, nodeIndex);
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Açgözlü Pul";
+        public string DisplayName => "Greedy Checker";
         public int Price => 260;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public GreedyChecker(int ownerId) : base(ownerId) { }

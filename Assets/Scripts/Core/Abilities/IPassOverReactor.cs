@@ -4,9 +4,9 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Abilities
 {
     /// <summary>
-    /// Vergi Pulu: "Bu pulun uzerinden gecen her rakip pulu icin (ustunden atlayip gitse bile)
-    /// +1 Altin yazilir." Klasik tavlada aradan gecilen haneler hic sorgulanmaz;
-    /// bu yetenek GameState'e yeni bir tarama adimi (gecis yolu) ekletiyor.
+    /// Tax Checker: "Earns +1 gold for every enemy checker that passes over it (even when jumping over)."
+    /// Classic backgammon never inspects the points in between; this ability adds a
+    /// pass-over scan step to GameState.
     /// </summary>
     public interface IPassOverReactor : ICheckerAbility
     {

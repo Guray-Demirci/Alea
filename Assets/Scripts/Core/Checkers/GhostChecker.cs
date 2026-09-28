@@ -5,9 +5,9 @@ using Tavla.Core.Interfaces;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Hayalet Pul. "Rakibin kapilarinin uzerinden atlayabilir, blokajlari yok sayar."
-    /// Parazit'ten FARKI: Hayalet blokaji yok sayarak haneye girer ve tek rakip pulu varsa
-    /// onu normal sekilde kirar; sadece 2+ pullu kapida kirmadan yanlarina konar.
+    /// Ghost Checker. "Can jump over the opponent's points and ignores blockades."
+    /// Difference from the Parasite: the Ghost ignores the blockade to enter a point and captures a
+    /// single enemy checker normally; only on a made point (2+ checkers) does it land beside them without capturing.
     /// </summary>
     public class GhostChecker : BaseChecker, IBlockadeBypass, IPermanent, IStarterItem
     {
@@ -20,10 +20,10 @@ namespace Tavla.Core.Checkers
 
         // --- IPurchasable ---
         public string ItemId => Id;
-        public string DisplayName => "Hayalet Pul";
+        public string DisplayName => "Ghost Checker";
         public int Price => 450;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         // --- IStarterItem ---

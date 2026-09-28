@@ -4,21 +4,20 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Relics
 {
     /// <summary>
-    /// A1 - Meridyen Kaymasi (Zar Sabitleme Karti) — TEK SEFERLIK.
-    /// "Tur basinda aktive ettiginde, o el atacagin zarlardan birini kesin olarak
-    /// sectigin sayiya sabitler."
-    /// Hak sayaci ve armed durumu ConsumableRelic'te; burada sadece etki var.
+    /// Meridian Shift (die-pinning card) — SINGLE USE.
+    /// "When activated at the start of a turn, one of the dice you roll this turn is pinned to the number you choose."
+    /// The charge counter and armed state live in <see cref="ConsumableRelic"/>; only the effect is here.
     /// </summary>
     public class MeridianShiftRelic : ConsumableRelic
     {
         public override string ItemId => "relic_meridian_shift";
-        public override string DisplayName => "Meridyen Kayması";
+        public override string DisplayName => "Meridian Shift";
         public override int Price => 180;
 
-        /// <summary>Sonucu dogrudan ezdigi icin en SON calismali.</summary>
+        /// <summary>It overrides the result directly, so it must run LAST.</summary>
         public override int Priority => 900;
 
-        /// <summary>Oyuncu hangi sayiya sabitleyecegini secer.</summary>
+        /// <summary>The player chooses which number to pin.</summary>
         public override bool RequiresChoice => true;
 
         private int _pinnedValue = GameState.MaxDieValue;
@@ -27,7 +26,7 @@ namespace Tavla.Core.Relics
 
         protected override void OnActivated(IMatchContext context, int choice)
         {
-            // Gecersiz secim gelirse en guclu degere duseriz.
+            // An invalid choice falls back to the strongest value.
             _pinnedValue = (choice >= 1 && choice <= GameState.MaxDieValue)
                 ? choice
                 : GameState.MaxDieValue;
@@ -38,7 +37,7 @@ namespace Tavla.Core.Relics
             if (!IsArmed)
                 return;
 
-            // Dokumandaki gorsel: "sol zar normal doner, sag zar oturur" -> ikinci zar.
+            // As in the design mock-up: "the left die rolls normally, the right die settles" -> second die.
             roll.OverrideDie(false, _pinnedValue);
             Disarm();
         }

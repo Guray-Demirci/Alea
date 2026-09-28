@@ -1,3 +1,4 @@
+using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
 using Tavla.Core.Runtime;
@@ -5,13 +6,13 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// C2 - Sisli Hane (The Fog). "Bu haneye giren her ozel pulun TUM ozel yetenekleri,
-    /// o hanede durdugu surece tamamen devre disi kalir (duz pula donusur)."
+    /// Fog Tile. "ALL special abilities of every special checker that enters this point are
+    /// completely disabled for as long as it stays there (it becomes a plain checker)."
     ///
-    /// MIMARININ SINAVI: Bu karo 18 pulun hicbirini tanimadan hepsini etkisizlestiriyor.
-    /// Tek yaptigi BaseChecker'daki yetenek kapisini kapatmak; kural motorunun geri kalani
-    /// zaten her seyi GetAbility uzerinden sordugu icin etki kendiliginden her yere yayiliyor.
-    /// Yarin 50 pul daha eklensin — bu dosya degismez.
+    /// THE ARCHITECTURE'S TEST: this tile neutralizes all 18 checkers without knowing any of them.
+    /// All it does is close the ability gate in BaseChecker; the rest of the rules engine asks
+    /// everything through GetAbility, so the effect spreads everywhere on its own.
+    /// Add 50 more checkers tomorrow — this file does not change.
     /// </summary>
     public class FogTile : BaseTileEffect
     {
@@ -22,13 +23,13 @@ namespace Tavla.Core.Tiles
         public override void OnCheckerLanded(IMatchContext context, Node node, BaseChecker checker)
         {
             checker.SetAbilitiesSuppressed(true);
-            context.Board.ReportAbility("FogEnter", checker, node.Index);
+            context.Board.ReportAbility(AbilityIds.FogEnter, checker, node.Index);
         }
 
         public override void OnCheckerLeft(IMatchContext context, Node node, BaseChecker checker)
         {
             checker.SetAbilitiesSuppressed(false);
-            context.Board.ReportAbility("FogExit", checker, node.Index);
+            context.Board.ReportAbility(AbilityIds.FogExit, checker, node.Index);
         }
     }
 }

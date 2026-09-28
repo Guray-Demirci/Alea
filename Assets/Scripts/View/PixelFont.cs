@@ -4,32 +4,32 @@ using UnityEngine;
 namespace Tavla.View
 {
     /// <summary>
-    /// 3x5'lik bitmap font. Glif sprite'larini KOD URETIR — projede tek bir font asset'i yoktur.
+    /// 3x5 bitmap font. The glyph sprites are GENERATED IN CODE — the project contains no font asset.
     ///
-    /// NEDEN TextMeshPro / uGUI DEGIL:
-    ///   • Packages/manifest.json'da com.unity.ugui yok; bu projede ne UnityEngine.UI.Text
-    ///     ne de TMP_Text derlenir. Paket eklemek, iki sayi basmak icin agir bir bagimlilik.
-    ///   • Tuval 320x180 ve 12 PPU. Vektor bir font bu olcekte yarim piksele oturur ve
-    ///     bulaniklasir; tahtanin geri kalani keskin piksel sanatken yazi yumusak gorunur.
-    ///   • Glifler SpriteRenderer oldugu icin panelin SortingGroup'una dogal olarak katilir;
-    ///     ayri bir Canvas / kamera / siralama dunyasi kurmak gerekmez.
+    /// WHY NOT TextMeshPro / uGUI:
+    ///   • Packages/manifest.json has no com.unity.ugui; neither UnityEngine.UI.Text nor TMP_Text
+    ///     compiles in this project. Adding a package just to print two numbers is a heavy dependency.
+    ///   • The canvas is 320x180 at 12 PPU. A vector font lands on half pixels at this scale and blurs;
+    ///     the text would look soft while the rest of the board is crisp pixel art.
+    ///   • Glyphs are SpriteRenderers, so they naturally join the panel's SortingGroup;
+    ///     no separate Canvas / camera / sorting world is needed.
     ///
-    /// Gliflerin dizilisi: soldan saga, YUKARIDAN ASAGIYA 15 bit. Once satir, sonra sutun:
+    /// Glyph encoding: 15 bits, left to right, TOP TO BOTTOM. Rows first, then columns:
     ///     1 1 1     "111"
     ///     1 0 1     "101"
-    ///     1 0 1  -> "101"  ->  "111101101101111"   ('0' karakteri)
+    ///     1 0 1  -> "101"  ->  "111101101101111"   (the '0' character)
     ///     1 0 1     "101"
     ///     1 1 1     "111"
     ///
-    /// Font SABIT GENISLIKTEDIR (monospace). HUD icin tercih sebebi: skor 99'dan 100'e
-    /// ciktiginda sayi kaymaz, panelde titreme olmaz.
+    /// The font is FIXED WIDTH (monospace). Chosen for the HUD so a score going from 99 to 100
+    /// does not shift the digits and the panel does not jitter.
     /// </summary>
     public static class PixelFont
     {
         public const int GlyphWidth = 3;
         public const int GlyphHeight = 5;
 
-        /// <summary>Bir karakterin kapladigi yatay adim: 3 px glif + 1 px bosluk.</summary>
+        /// <summary>Horizontal advance of one character: 3 px glyph + 1 px spacing.</summary>
         public const int Advance = GlyphWidth + 1;
 
         private static readonly Dictionary<char, string> Glyphs = new Dictionary<char, string>
@@ -64,12 +64,24 @@ namespace Tavla.View
             { ')', "100010010010100" }
         };
 
-        // Atlas bir kez uretilir; butun etiketler ayni dokuyu paylasir.
+        // The atlas is generated once; all labels share the same texture.
         private static Texture2D _atlas;
         private static float _atlasPixelsPerUnit;
         private static readonly Dictionary<char, Sprite> Sprites = new Dictionary<char, Sprite>();
 
-        /// <summary>Metnin piksel cinsinden genisligi. Son karakterin ardindaki bosluk sayilmaz.</summary>
+        /// <summary>
+        /// Resets the static cache when Play mode starts. With "Enter Play Mode Options" (domain reload
+        /// disabled) statics survive between sessions while the textures they point to do not.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _atlas = null;
+            _atlasPixelsPerUnit = 0f;
+            Sprites.Clear();
+        }
+
+        /// <summary>Width of the text in pixels. The spacing after the last character is not counted.</summary>
         public static int Measure(string text)
         {
             if (string.IsNullOrEmpty(text))
@@ -79,8 +91,8 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Bir karakterin sprite'i. Bosluk icin null doner (cizilecek bir sey yok),
-        /// taninmayan karakter '?' olur — panelde sessizce kaybolmasin, gorulup duzeltilsin.
+        /// Sprite of a character. Returns null for a space (nothing to draw);
+        /// an unknown character becomes '?' — so it does not silently disappear from the panel but gets noticed and fixed.
         /// </summary>
         public static Sprite GetGlyph(char character, float pixelsPerUnit)
         {
@@ -98,9 +110,9 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Turkce harfleri ASCII karsiligina indirger ve buyuk harfe cevirir.
-        /// Font 3 piksel genisliginde; noktali/kuyruklu harfleri ayirt edecek yer yok,
-        /// "I" ile "İ"yi ayni cizmek onlari kaybetmekten iyidir.
+        /// Folds Turkish letters to their ASCII counterparts and converts to upper case.
+        /// The font is 3 pixels wide; there is no room to distinguish dotted/cedilla letters,
+        /// and drawing "I" and "İ" the same is better than losing them.
         /// </summary>
         private static char Normalize(char character)
         {
@@ -117,13 +129,13 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Atlasi (gerekirse) uretir.
+        /// Generates the atlas (if needed).
         ///
-        /// Iki kosulda yeniden uretilir:
-        ///   1) PPU degisti — sprite'lar dunya olcegini icinde tasir.
-        ///   2) _atlas "yok edilmis" durumda. Enter Play Mode Options ile domain reload
-        ///      kapaliyken statik alan ayakta kalir ama Texture2D oyun bitince silinir;
-        ///      Unity'nin null karsilastirmasi bunu yakalar.
+        /// It is regenerated in two cases:
+        ///   1) The PPU changed — sprites carry the world scale inside them.
+        ///   2) _atlas has been "destroyed". Unity's null comparison catches textures that were
+        ///      released when Play mode ended.
+        /// The previous atlas and its sprites are destroyed before rebuilding so nothing leaks.
         /// </summary>
         private static void EnsureAtlas(float pixelsPerUnit)
         {
@@ -133,14 +145,14 @@ namespace Tavla.View
             if (_atlas != null && Mathf.Approximately(_atlasPixelsPerUnit, pixelsPerUnit))
                 return;
 
-            Sprites.Clear();
+            ReleaseAtlas();
             _atlasPixelsPerUnit = pixelsPerUnit;
 
             char[] order = new char[Glyphs.Count];
             Glyphs.Keys.CopyTo(order, 0);
 
-            // Glifler arasinda 1 px seffaf bosluk: filtreleme Point olsa da komsu
-            // pikselin sizmasina karsi ucuz bir emniyet.
+            // 1 px transparent gap between glyphs: a cheap safeguard against neighbouring pixels
+            // bleeding in, even with Point filtering.
             int width = order.Length * (GlyphWidth + 1);
 
             Texture2D texture = new Texture2D(width, GlyphHeight, TextureFormat.RGBA32, false);
@@ -163,7 +175,7 @@ namespace Tavla.View
                         if (bits[row * GlyphWidth + col] != '1')
                             continue;
 
-                        // Glif tablosu yukaridan asagi okunur, doku asagidan yukari dizilir.
+                        // The glyph table is read top to bottom, the texture is laid out bottom to top.
                         int y = GlyphHeight - 1 - row;
                         pixels[y * width + originX + col] = on;
                     }
@@ -178,13 +190,29 @@ namespace Tavla.View
             {
                 Rect rect = new Rect(i * (GlyphWidth + 1), 0f, GlyphWidth, GlyphHeight);
 
-                // Pivot sol-alt: yerlesim hesabi (PixelLabel) boylece dogrudan piksel
-                // koordinatiyla calisir, glif genisligini pivottan geri hesaplamaz.
+                // Bottom-left pivot: the layout code (PixelLabel) can then work directly in pixel
+                // coordinates without deriving the glyph width back from the pivot.
                 Sprite sprite = Sprite.Create(texture, rect, Vector2.zero, pixelsPerUnit, 0,
                                               SpriteMeshType.FullRect);
                 sprite.name = "Glyph_" + order[i];
                 Sprites.Add(order[i], sprite);
             }
+        }
+
+        /// <summary>Destroys the current atlas texture and its sprites (runtime-created objects are not collected).</summary>
+        private static void ReleaseAtlas()
+        {
+            foreach (Sprite sprite in Sprites.Values)
+            {
+                if (sprite != null)
+                    Object.Destroy(sprite);
+            }
+            Sprites.Clear();
+
+            if (_atlas != null)
+                Object.Destroy(_atlas);
+
+            _atlas = null;
         }
     }
 }

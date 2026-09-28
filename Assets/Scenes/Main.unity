@@ -369,6 +369,7 @@ MonoBehaviour:
   _layout: {fileID: 0}
   _checkerSprite: {fileID: 21300000, guid: a1b2c3d4e5f60718293a4b5c6d7e8f90, type: 3}
   _boardSprite: {fileID: 21300000, guid: 0f1e2d3c4b5a69788796a5b4c3d2e1f0, type: 3}
+  _backgroundSprite: {fileID: 21300000, guid: c29f4812d1414dd2821f4b2770d75a83, type: 3}
   _checkerPrefab: {fileID: 0}
   _nodePrefab: {fileID: 0}
   _player0Color: {r: 1, g: 1, b: 1, a: 1}
@@ -421,27 +422,31 @@ MonoBehaviour:
   _slots:
   - Field: 0
     LayerName: Score
+    Caption: SCORE
     PixelOffset: {x: 0, y: 0}
     Align: 1
-    Color: {r: 1, g: 1, b: 1, a: 1}
+    Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
     FallbackPixel: {x: 44, y: 96}
   - Field: 1
     LayerName: Gold
+    Caption: GOLD
     PixelOffset: {x: 0, y: 0}
     Align: 1
-    Color: {r: 1, g: 1, b: 1, a: 1}
+    Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
     FallbackPixel: {x: 44, y: 120}
   - Field: 2
     LayerName: Hamle
+    Caption: MOVE
     PixelOffset: {x: 0, y: 0}
     Align: 1
-    Color: {r: 1, g: 1, b: 1, a: 1}
+    Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
     FallbackPixel: {x: 44, y: 144}
   - Field: 3
     LayerName: Task
+    Caption: TASK
     PixelOffset: {x: 0, y: 0}
     Align: 1
-    Color: {r: 1, g: 1, b: 1, a: 1}
+    Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
     FallbackPixel: {x: 44, y: 64}
 --- !u!114 &1690880813
 MonoBehaviour:

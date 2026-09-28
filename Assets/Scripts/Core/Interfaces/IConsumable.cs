@@ -3,38 +3,38 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Interfaces
 {
     /// <summary>
-    /// SATIN ALINABILIR — TEK SEFERLIK DAL.
-    /// Sinirli kullanim hakki olan, harcandiginda biten ogeler.
-    /// Meridyen Kaymasi ve Kartografin Hilesi bu dalda; ileride eklenecek
-    /// tek kullanimlik kartlar/tuzaklar da buraya girecek.
+    /// PURCHASABLE — SINGLE-USE BRANCH.
+    /// Items with a limited number of uses that are gone once spent.
+    /// Meridian Shift and Cartographer's Cheat live here; future single-use
+    /// cards/traps belong to this branch as well.
     ///
-    /// Hak sayisi bilerek 1'e sabitlenmedi: "3 kullanimlik" bir kart eklemek
-    /// yeni bir arayuz degil, sadece farkli bir MaxCharges degeri gerektirir.
+    /// The charge count is intentionally not fixed at 1: adding a "3 uses" card
+    /// requires only a different MaxCharges value, not a new interface.
     /// </summary>
     public interface IConsumable : IPurchasable
     {
-        /// <summary>Tam doluyken kac kullanim hakki var.</summary>
+        /// <summary>Number of uses when fully charged.</summary>
         int MaxCharges { get; }
 
-        /// <summary>Kalan kullanim hakki.</summary>
+        /// <summary>Remaining uses.</summary>
         int RemainingCharges { get; }
 
-        /// <summary>Hakki bitti mi? Bittiginde envanterden dusulur.</summary>
+        /// <summary>Are all charges spent? Depleted items are removed from the inventory.</summary>
         bool IsDepleted { get; }
 
         /// <summary>
-        /// Kullanmadan once oyuncunun bir deger secmesi gerekiyor mu?
-        /// (Meridyen Kaymasi: "zar hangi sayiya sabitlensin?") UI buna bakip secim ekrani acar.
+        /// Does the player need to pick a value before using it?
+        /// (Meridian Shift: "which number should the die be pinned to?") The UI opens a picker based on this.
         /// </summary>
         bool RequiresChoice { get; }
 
         /// <summary>
-        /// Bir hak harcayarak ogeyi devreye alir. Hak kalmadiysa false doner ve hicbir sey degismez.
+        /// Arms the item by spending one charge. Returns false and changes nothing if no charges are left.
         /// </summary>
-        /// <param name="choice">RequiresChoice false ise yok sayilir.</param>
+        /// <param name="choice">Ignored when <see cref="RequiresChoice"/> is false.</param>
         bool TryActivate(IMatchContext context, int choice);
 
-        /// <summary>Dukkandan yeniden dolum.</summary>
+        /// <summary>Recharge from the shop.</summary>
         void Refill();
     }
 }

@@ -4,23 +4,23 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Relics
 {
     /// <summary>
-    /// Zar sistemine mudahale eden tilsimlar (dokumandaki A bolumu).
-    /// IKI ayri hook var cunku dokumandaki 4 mekanik iki farkli ana dokunuyor:
-    ///   ModifyFaces -> ATISTAN ONCE zarin yuzeylerini degistirir (Firtina Raporu)
-    ///   ModifyRoll  -> ATISTAN SONRA sonucu yorumlar (Meridyen, Ikiz Ruzgarlar, Kartograf)
+    /// Relics that interfere with the dice system.
+    /// There are TWO hooks because the four designed mechanics touch two different moments:
+    ///   ModifyFaces -> BEFORE the roll, changes the faces of the die (Storm Report)
+    ///   ModifyRoll  -> AFTER the roll, interprets the result (Meridian Shift, Twin Winds, Cartographer's Cheat)
     /// </summary>
     public interface IDiceModifier
     {
-        /// <summary>Kucuk deger once calisir. Yuzey degistirenler, sonuc yorumlayanlardan once gelmeli.</summary>
+        /// <summary>Lower values run first. Face modifiers must run before result interpreters.</summary>
         int Priority { get; }
 
-        /// <summary>Tilsim hala etkin mi? (Tek kullanimliklar tukenince false doner.)</summary>
+        /// <summary>Is the relic still active? (Single-use relics return false once spent.)</summary>
         bool IsActive { get; }
 
-        /// <summary>Zarin yuzeyindeki sayi havuzunu degistirir. Liste yerinde duzenlenir.</summary>
+        /// <summary>Modifies the pool of face values. The list is edited in place.</summary>
         void ModifyFaces(List<int> faces);
 
-        /// <summary>Atilan sonucu degistirir.</summary>
+        /// <summary>Modifies the rolled result.</summary>
         void ModifyRoll(DiceRoll roll, IRandomProvider random);
     }
 }

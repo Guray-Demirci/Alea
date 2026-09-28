@@ -3,13 +3,13 @@ using Tavla.Core.Board;
 namespace Tavla.Core.Abilities
 {
     /// <summary>
-    /// Parazit Pul: "Rakibin kapi aldigi bir haneye sinsice sizabilir."
-    /// Bypass'tan FARKI: Hayalet haneyi es gecip devam eder, Parazit haneye YERLESIR
-    /// ve rakiple ayni hanede birlikte durur. Bu yuzden Node artik iki sahipli olabilir.
+    /// Parasite Checker: "Can sneak onto a point the opponent has made."
+    /// Difference from <see cref="IBlockadeBypass"/>: the Ghost passes the point by, the Parasite
+    /// SETTLES on it and shares the point with the opponent. This is why a Node can have two owners.
     /// </summary>
     public interface IInfiltrator : ICheckerAbility
     {
-        /// <summary>Rakip kapisina sizabilir mi? Sizma sirasinda kirma YAPILMAZ.</summary>
+        /// <summary>Can it infiltrate the enemy point? No capture happens during infiltration.</summary>
         bool CanInfiltrate(Node target);
     }
 }

@@ -3,10 +3,13 @@ using System.Collections.Generic;
 namespace Tavla.Core.Runtime
 {
     /// <summary>
-    /// Bir eldeki zar durumu. Iki farkli tuketim modu vardir:
-    ///   Normal mod  : Atilan degerler tek tek harcanir (klasik tavla).
-    ///   FreeSplit   : "Kartografin Hilesi" aktifse zarlarin TOPLAMI havuz olur ve
-    ///                 istenen buyuklukte parcalara bolunerek istenen pullara dagitilir.
+    /// Dice state of one turn. Two consumption modes exist:
+    ///   Normal mode : rolled values are spent one by one (classic backgammon).
+    ///   FreeSplit   : with "Cartographer's Cheat" active, the SUM of the dice becomes a pool that
+    ///                 can be split into any parts and distributed across any checkers.
+    ///
+    /// Readers (View, bot) only see the public queries. Mutators are <c>internal</c> so the dice can
+    /// only be changed by Core rules (moves, abilities, relics) — never directly from the View.
     /// </summary>
     public class DiceRoll
     {
@@ -16,19 +19,19 @@ namespace Tavla.Core.Runtime
         public int Second { get; private set; }
         public bool IsDouble => First == Second;
 
-        /// <summary>Kartografin Hilesi: toplam puani serbestce bolme modu.</summary>
-        public bool FreeSplit { get; set; }
+        /// <summary>Cartographer's Cheat: the total may be split freely.</summary>
+        public bool FreeSplit { get; internal set; }
 
-        /// <summary>FreeSplit modunda kalan toplam puan.</summary>
+        /// <summary>Remaining total in FreeSplit mode.</summary>
         public int FreeTotal { get; private set; }
 
-        /// <summary>Normal modda kalan hamle degerleri.</summary>
+        /// <summary>Remaining move values in normal mode.</summary>
         public IReadOnlyList<int> RemainingMoves => _moves;
 
         public bool HasMovesLeft => FreeSplit ? FreeTotal > 0 : _moves.Count > 0;
 
-        /// <summary>Zarlari kurar. Cift gelirse klasik kurala gore 4 hamle hakki dogar.</summary>
-        public void Set(int first, int second)
+        /// <summary>Sets the dice. A double grants 4 moves, as in the classic rules.</summary>
+        internal void Set(int first, int second)
         {
             First = first;
             Second = second;
@@ -46,8 +49,8 @@ namespace Tavla.Core.Runtime
             FreeTotal = first + second;
         }
 
-        /// <summary>Bir zar degerini elle degistirir (Meridyen Kaymasi / Sabitleyici Pul kullanir).</summary>
-        public void OverrideDie(bool overrideFirst, int value)
+        /// <summary>Overrides one die value (used by Meridian Shift / Anchor Checker).</summary>
+        internal void OverrideDie(bool overrideFirst, int value)
         {
             if (overrideFirst)
                 Set(value, Second);
@@ -55,7 +58,7 @@ namespace Tavla.Core.Runtime
                 Set(First, value);
         }
 
-        /// <summary>Verilen mesafe icin hamle hakki var mi? (Saf sorgu, harcama yapmaz.)</summary>
+        /// <summary>Is there a move available for the given distance? (Pure query, spends nothing.)</summary>
         public bool CanAfford(int distance)
         {
             if (distance <= 0)
@@ -64,8 +67,8 @@ namespace Tavla.Core.Runtime
             return FreeSplit ? distance <= FreeTotal : _moves.Contains(distance);
         }
 
-        /// <summary>Hamle hakkini harcar. Hak yoksa false doner ve hicbir sey degismez.</summary>
-        public bool Consume(int distance)
+        /// <summary>Spends a move. Returns false and changes nothing if no move is available.</summary>
+        internal bool Consume(int distance)
         {
             if (!CanAfford(distance))
                 return false;
@@ -78,23 +81,23 @@ namespace Tavla.Core.Runtime
             return true;
         }
 
-        /// <summary>Gele Pulu: ekstra hamle hakki ekler.</summary>
-        public void GrantExtraMove(int value)
+        /// <summary>Double Down Checker: grants an extra move.</summary>
+        internal void GrantExtraMove(int value)
         {
             _moves.Add(value);
             FreeTotal += value;
         }
 
-        /// <summary>Gele Pulu'nun kotu sonucu: o eldeki kalan tum hamle haklari yanar.</summary>
-        public void LoseRemainingMoves()
+        /// <summary>Double Down Checker's bad outcome: all remaining moves of this turn are lost.</summary>
+        internal void LoseRemainingMoves()
         {
             _moves.Clear();
             FreeTotal = 0;
         }
 
         /// <summary>
-        /// Zar durumunun bagimsiz bir kopyasi. Yapay zeka "su hamleyi yaparsam ne olur?"
-        /// denemesi yaparken gercek zarlari harcamamali — klon tahtaya bu kopya baglanir.
+        /// An independent copy of the dice state. When the AI asks "what happens if I play this move?"
+        /// it must not spend the real dice — the clone board is bound to this copy.
         /// </summary>
         public DiceRoll Clone()
         {

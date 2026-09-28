@@ -6,19 +6,25 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// Ozel karolarin ortak iskeleti. TUM hook'lar "hicbir sey yapma" varsayilaniyla gelir,
-    /// boylece her karo sadece ilgilendigi hook'u override eder (ISP).
-    /// Orn: Sisli Hane sadece Landed/Left'i, Zindan sadece izin sorgularini ezer.
+    /// Common skeleton of special tiles. EVERY hook comes with a "do nothing" default,
+    /// so each tile overrides only the hooks it cares about (ISP).
+    /// E.g. the Fog Tile only overrides Landed/Left, the Dungeon only the permission queries.
     /// </summary>
     public abstract class BaseTileEffect : ITileEffect
     {
+        /// <summary>Owner id used by neutral map tiles.</summary>
+        public const int NeutralOwner = -1;
+
+        /// <summary>Remaining-turn value reported by tiles that never expire.</summary>
+        public const int Permanent = -1;
+
         public abstract string EffectId { get; }
 
-        /// <summary>Harita karolari tarafsizdir (-1); oyuncu tarafindan kurulan tuzaklar sahibini tasir.</summary>
+        /// <summary>Map tiles are neutral (<see cref="NeutralOwner"/>); traps placed by a player carry their owner.</summary>
         public int OwnerId { get; private set; }
 
-        /// <summary>Kalici karolar icin -1. Sureli karolar override eder.</summary>
-        public virtual int RemainingTurns => -1;
+        /// <summary><see cref="Permanent"/> for permanent tiles. Timed tiles override this.</summary>
+        public virtual int RemainingTurns => Permanent;
 
         public virtual bool IsExpired => false;
 
@@ -36,12 +42,12 @@ namespace Tavla.Core.Tiles
 
         public virtual void OnTurnPassed(IMatchContext context, Node node) { }
 
-        protected BaseTileEffect(int ownerId = -1)
+        protected BaseTileEffect(int ownerId = NeutralOwner)
         {
             OwnerId = ownerId;
         }
 
-        /// <summary>Yardimci: verilen pulun rakibinin kimligi (kirma islemlerinde "kiran taraf" olarak kullanilir).</summary>
+        /// <summary>Helper: id of the given checker's opponent (used as the "capturing side" when a tile captures).</summary>
         protected static int OpponentOf(BaseChecker checker)
         {
             return (checker.OwnerId + 1) % GameState.PlayerCount;

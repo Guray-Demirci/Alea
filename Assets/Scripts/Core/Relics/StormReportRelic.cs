@@ -3,14 +3,14 @@ using System.Collections.Generic;
 namespace Tavla.Core.Relics
 {
     /// <summary>
-    /// A3 - Firtina Raporu — KALICI.
-    /// "Zar havuzundaki istedigin bir rakami tamamen siler, yerine istedigin baska bir sayiyi kazir."
-    /// Atistan ONCE calisir -> dusuk oncelik degeri.
+    /// Storm Report — PERMANENT.
+    /// "Erases one number of your choice from the dice pool and engraves another number of your choice in its place."
+    /// Runs BEFORE the roll -> low priority value.
     /// </summary>
     public class StormReportRelic : PermanentRelic
     {
         public override string ItemId => "relic_storm_report";
-        public override string DisplayName => "Fırtına Raporu";
+        public override string DisplayName => "Storm Report";
         public override int Price => 350;
 
         public override int Priority => 10;
@@ -18,8 +18,8 @@ namespace Tavla.Core.Relics
         private readonly int _removedFace;
         private readonly int _engravedFace;
 
-        /// <param name="removedFace">Silinecek yuz (orn. 1).</param>
-        /// <param name="engravedFace">Yerine kazinacak sayi (orn. 6).</param>
+        /// <param name="removedFace">Face to erase (e.g. 1).</param>
+        /// <param name="engravedFace">Number to engrave instead (e.g. 6).</param>
         public StormReportRelic(int removedFace, int engravedFace)
         {
             _removedFace = removedFace;
@@ -28,8 +28,8 @@ namespace Tavla.Core.Relics
 
         public override void ModifyFaces(List<int> faces)
         {
-            // Tek bir yuzu degistiriyoruz; RemoveAll kullanirsak ust uste kazimalarda
-            // ayni sayidan birden fazlasi varsa hepsi silinir - istemedigimiz sonuc.
+            // Only one face is replaced; RemoveAll would erase every copy of the number when several
+            // engravings stack on each other — not what we want.
             int index = faces.IndexOf(_removedFace);
             if (index < 0)
                 return;

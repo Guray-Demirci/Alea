@@ -1,3 +1,4 @@
+using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
 using Tavla.Core.Runtime;
@@ -5,11 +6,11 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// C5 - Zindan Hanesi (Iron Cage). Acil-kapan dongusu:
-    ///   Kapali tur: icerideki pullar oynatilamaz, disaridan pul giremez, kapi alinamaz.
-    ///   Acik tur  : hane tamamen normal davranir.
-    /// Uc ayri izin sorgusunu da ezen tek karo bu — hook setinin neden bu kadar
-    /// ayrintili oldugunun cevabi burada.
+    /// Dungeon Tile (Iron Cage). Open/close cycle:
+    ///   Closed turn: checkers inside cannot move, no checker can enter, no point can be made.
+    ///   Open turn  : the point behaves completely normally.
+    /// The only tile that overrides all three permission queries — it is the reason the hook set
+    /// is so fine-grained.
     /// </summary>
     public class DungeonTile : BaseTileEffect
     {
@@ -17,7 +18,7 @@ namespace Tavla.Core.Tiles
 
         public override string EffectId => Id;
 
-        /// <summary>Parmakliklar kapali mi? View bu degere bakip kafes animasyonunu oynatir.</summary>
+        /// <summary>Are the bars closed? The View uses this to play the cage animation.</summary>
         public bool IsClosed { get; private set; }
 
         public DungeonTile(bool startClosed = true)
@@ -34,7 +35,8 @@ namespace Tavla.Core.Tiles
         public override void OnTurnPassed(IMatchContext context, Node node)
         {
             IsClosed = !IsClosed;
-            context.Board.ReportAbility(IsClosed ? "DungeonClosed" : "DungeonOpened", null, node.Index);
+            context.Board.ReportAbility(IsClosed ? AbilityIds.DungeonClosed : AbilityIds.DungeonOpened,
+                                        null, node.Index);
         }
     }
 }

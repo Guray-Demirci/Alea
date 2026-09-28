@@ -1,3 +1,4 @@
+using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
 using Tavla.Core.Runtime;
@@ -5,9 +6,9 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// C4 - Haydut Kampi (The Toll Booth). "Bu haneden GECEN veya buraya OTURAN her pul icin
-    /// kasandan -2 Altin eksilir. Paran yoksa altinin eksiye dusmez ama skordan puan silinir."
-    /// Borc kurali MatchContext.AddGold icinde tek yerde uygulanir — karonun bilmesi gerekmez.
+    /// Toll Booth Tile. "For every checker that PASSES this point or SITS on it, 2 gold is taken from
+    /// your purse. If you have no money your gold does not go negative, but score points are deducted."
+    /// The debt rule is applied in one place, <see cref="MatchContext.AddGold"/> — the tile does not need to know it.
     /// </summary>
     public class TollBoothTile : BaseTileEffect
     {
@@ -29,7 +30,7 @@ namespace Tavla.Core.Tiles
         private static void Collect(IMatchContext context, Node node, BaseChecker checker)
         {
             context.AddGold(checker.OwnerId, TollCost);
-            context.Board.ReportAbility("TollPaid", checker, node.Index);
+            context.Board.ReportAbility(AbilityIds.TollPaid, checker, node.Index);
         }
     }
 }

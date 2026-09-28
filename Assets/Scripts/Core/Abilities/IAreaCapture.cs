@@ -3,13 +3,13 @@ using Tavla.Core.Board;
 namespace Tavla.Core.Abilities
 {
     /// <summary>
-    /// Kiyamet Pulu: "Rakibin kapi aldigi bir haneye tam zariyla denk gelirse,
-    /// o hanedeki TUM rakip pullarini tek seferde kirar."
-    /// Klasik tavlada kapiya girilemez; bu yetenek o kisiti tamamen tersine cevirir.
+    /// Doomsday Checker: "If it lands exactly on a point the opponent has made,
+    /// it captures ALL enemy checkers on that point at once."
+    /// Classic backgammon forbids entering a made point; this ability inverts that rule.
     /// </summary>
     public interface IAreaCapture : ICheckerAbility
     {
-        /// <summary>Bu hedefteki tum rakip pullarini kirabilir mi?</summary>
+        /// <summary>Can this checker capture every enemy checker on the target point?</summary>
         bool CanCaptureEntirePoint(Node target);
     }
 }

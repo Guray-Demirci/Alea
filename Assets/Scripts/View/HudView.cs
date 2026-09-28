@@ -5,110 +5,153 @@ using UnityEngine.Rendering;
 namespace Tavla.View
 {
     /// <summary>
-    /// Panelde sayi/metin basilabilen slotlar. Adlar Aseprite katmanlariyla eslesir;
-    /// hangi katmana yazildigi Inspector'dan degistirilebilir.
+    /// Slots on the panel that can display a number/text. Names match the Aseprite layers;
+    /// which layer a slot writes to can be changed in the Inspector.
     /// </summary>
     public enum HudField
     {
-        /// <summary>Oyuncunun toplam skoru.</summary>
+        /// <summary>The player's total score.</summary>
         Score,
 
-        /// <summary>Oyuncunun altini.</summary>
+        /// <summary>The player's gold.</summary>
         Gold,
 
-        /// <summary>O eldeki kalan hamle haklari (zarlar).</summary>
+        /// <summary>Remaining moves (dice) of the current turn.</summary>
         Moves,
 
-        /// <summary>Gorev/durum satiri. Varsayilan olarak kalan tur sayisini gosterir.</summary>
+        /// <summary>Task/status line. Shows the remaining turns by default.</summary>
         Task
     }
 
     /// <summary>
-    /// Sol taraftaki bilgi paneline (general_info_scheme.aseprite) calisma anindan erisim.
+    /// Runtime access to the info panel on the left (general_info_scheme.aseprite).
     ///
-    /// Katmanlari BU SCRIPT URETMEZ. Aseprite importer, "Animated Sprite + Individual Layers"
-    /// modunda her katman icin bir cocuk GameObject + SpriteRenderer iceren bir prefab uretiyor;
-    /// bu bilesen o prefab'in koku uzerinde durur ve cocuklari isimleriyle bulur.
+    /// THIS SCRIPT DOES NOT CREATE the layers. In "Animated Sprite + Individual Layers" mode the Aseprite
+    /// importer generates a prefab with one child GameObject + SpriteRenderer per layer; this component
+    /// sits on that prefab's root and finds the children by name.
     ///
-    /// Pivot Space = Canvas oldugu icin butun katmanlar localPosition (0,0)'dadir ve
-    /// Aseprite'taki dizilim korunur. Tuval 320x180 — tahta semasiyla ayni — dolayisiyla
-    /// kok (0,0,0)'a konuldugunda panel tahtaya gore de hizalidir.
+    /// Because Pivot Space = Canvas, every layer is at localPosition (0,0) and the Aseprite arrangement
+    /// is preserved. The canvas is 320x180 — the same as the board scheme — so with the root at (0,0,0)
+    /// the panel is also aligned with the board.
     ///
-    /// SAYILAR: panel sanatinda "Score", "Gold", "Hamle", "Task" kutulari var ama icleri bos.
-    /// Bu bilesen her kutunun uzerine bir PixelLabel oturtur ve disariya "su alana su metni
-    /// yaz" demekten ibaret bir API acar. Degerlerin NE oldugunu bilmez — onu HudPresenter bilir.
+    /// NUMBERS: the panel art has "Score", "Gold", "Hamle" (moves) and "Task" boxes, but they are empty
+    /// (plain white). This component draws a caption ("SCORE") on the LEFT of each box and the value on the
+    /// RIGHT, and exposes an API that is nothing more than "write this text in that slot". It does not know
+    /// WHAT the values are — HudPresenter does. Captions live here, not in the art, so the caption uses the
+    /// same font and colour as the value and the box can shrink the caption to make room for the value.
     ///
-    /// Slot konumlari ELLE GIRILMEZ: her etiket, ayni isimli Aseprite katmaninin gorsel
-    /// kutusunun merkezine oturur. Sanatci kutuyu panelde kaydirirsa yazi kendiliginde
-    /// onunla gider; kod degismez.
+    /// Slot positions are NOT ENTERED BY HAND: every label snaps to the visual box of the Aseprite layer
+    /// with the same name (caption on the left edge, value on the right edge). If the artist moves the box
+    /// on the panel, the text follows automatically; the code does not change.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HudView : MonoBehaviour
     {
-        /// <summary>Bir slotun nereye ve nasil yazacagi. Tamamen gorsel ayar — veri icermez.</summary>
+        /// <summary>Brown of the panel background (general_info_scheme). Readable on the white boxes.</summary>
+        private static readonly Color PanelBrown = new Color32(102, 57, 49, 255);
+
+        /// <summary>Default box width if the layer is not found — the bars in the scheme are 40 px.</summary>
+        private const int FallbackBoxWidth = 40;
+
+        /// <summary>Where and how a slot writes. Purely visual settings — holds no data.</summary>
         [System.Serializable]
         private sealed class HudSlot
         {
             public HudField Field;
 
-            [Tooltip("Aseprite katman adı. Değer bu katmanın görsel kutusunun merkezine yazılır.")]
+            [Tooltip("Aseprite layer name. The value is written into this layer's visual box.")]
             public string LayerName;
 
-            [Tooltip("Kutu merkezine göre piksel kaydırma. +x sağa, +y AŞAĞI (Aseprite yönü).")]
+            [Tooltip("Fixed caption written on the left of the box (\"SCORE\"). If set, the value is right-aligned; " +
+                     "if caption and value do not fit side by side the caption is hidden. If empty only the value is drawn.")]
+            public string Caption;
+
+            [Tooltip("Pixel offset relative to the box centre. +x right, +y DOWN (Aseprite direction).")]
             public Vector2 PixelOffset;
 
+            [Tooltip("Alignment of the value relative to the box centre when there is NO caption. With a caption the value is always right-aligned.")]
             public PixelTextAlign Align = PixelTextAlign.Center;
 
-            public Color Color = Color.white;
+            [Tooltip("Colour of the caption and the value. The boxes are white; light colours are invisible.")]
+            public Color Color = PanelBrown;
 
-            [Tooltip("Katman bulunamazsa kullanılacak tuval pikseli (320x180 şemasında).")]
+            [Tooltip("Canvas pixel used if the layer is not found (in the 320x180 scheme).")]
             public Vector2 FallbackPixel;
         }
 
-        [Header("Sıralama")]
-        [Tooltip("Kokteki SortingGroup'un katman sirasi. Pullar 10+ katmaninda duruyor; " +
-                 "panelin onlerinde kalmasi icin yuksek bir deger. SortingGroup butun " +
-                 "cocuklari TEK parca olarak siraladigi icin bu deger sart.")]
-        [SerializeField] private int _sortingOrder = 200;
+        /// <summary>Runtime labels of a slot.</summary>
+        private sealed class SlotLabels
+        {
+            public PixelLabel Value;
 
-        [Tooltip("Yazıların panel katmanlarının ÜSTÜNDE kalması için sıra değeri. " +
-                 "Importer katmanlara 0'dan başlayan küçük sıralar verdiği için 100 rahat bir tavan.")]
-        [SerializeField] private int _textSortingOrder = 100;
+            /// <summary>Null if no caption is defined.</summary>
+            public PixelLabel Caption;
 
-        [Header("Yazı")]
-        [Tooltip("Piksel/birim oranı ve piksel->dünya çevrimi buradan okunur. " +
-                 "Boş bırakılırsa varsayılan geometriyle (320x180 @ 12 PPU) çalışır.")]
+            /// <summary>Pixel width of the box minus the padding on both sides.</summary>
+            public int InnerWidth;
+        }
+
+        [Header("Sorting")]
+        [Tooltip("Sorting order of the root SortingGroup. Checkers use orders 10+; a high value keeps the " +
+                 "panel in front of them. Required because a SortingGroup sorts all its children as ONE unit.")]
+        [SerializeField] private int _sortingOrder = SortingOrders.HudPanel;
+
+        [Tooltip("Sorting order that keeps the text ABOVE the panel layers. The importer gives layers small " +
+                 "orders starting at 0, so 100 is a comfortable ceiling.")]
+        [SerializeField] private int _textSortingOrder = SortingOrders.HudTextInGroup;
+
+        [Header("Text")]
+        [Tooltip("Pixels-per-unit and the pixel->world conversion are read from here. " +
+                 "If empty, the default geometry (320x180 @ 12 PPU) is used.")]
         [SerializeField] private BoardLayout _layout;
 
-        [Tooltip("Hangi değerin hangi katmana yazılacağı. Katman adları Aseprite'taki adlardır.")]
+        [Tooltip("Which value is written to which layer. Layer names are the names used in Aseprite.")]
         [SerializeField]
         private HudSlot[] _slots =
         {
-            new HudSlot { Field = HudField.Score, LayerName = "Score", FallbackPixel = new Vector2(44f, 96f) },
-            new HudSlot { Field = HudField.Gold,  LayerName = "Gold",  FallbackPixel = new Vector2(44f, 120f) },
-            new HudSlot { Field = HudField.Moves, LayerName = "Hamle", FallbackPixel = new Vector2(44f, 144f) },
-            new HudSlot { Field = HudField.Task,  LayerName = "Task",  FallbackPixel = new Vector2(44f, 64f) }
+            // "Hamle" is the name of the moves layer in the Aseprite file; it must match the art, not the code.
+            new HudSlot { Field = HudField.Score, LayerName = "Score", Caption = "SCORE", FallbackPixel = new Vector2(44f, 96f) },
+            new HudSlot { Field = HudField.Gold,  LayerName = "Gold",  Caption = "GOLD",  FallbackPixel = new Vector2(44f, 120f) },
+            new HudSlot { Field = HudField.Moves, LayerName = "Hamle", Caption = "MOVE",  FallbackPixel = new Vector2(44f, 144f) },
+            new HudSlot { Field = HudField.Task,  LayerName = "Task",  Caption = "TASK",  FallbackPixel = new Vector2(44f, 64f) }
         };
 
+        [Tooltip("Pixel distance between the caption/value and the box edges.")]
+        [SerializeField] private int _boxPadding = 2;
+
+        [Tooltip("Minimum pixels between caption and value. If they do not fit, the caption is hidden.")]
+        [SerializeField] private int _captionGap = 3;
+
         private readonly Dictionary<string, SpriteRenderer> _layers = new();
-        private readonly Dictionary<HudField, PixelLabel> _labels = new();
+        private readonly Dictionary<HudField, SlotLabels> _labels = new();
 
         private bool _built;
+        private bool _ownsLayout;
 
         private void Awake()
         {
             EnsureBuilt();
         }
 
-        #region Kurulum
+        private void OnDestroy()
+        {
+            // A layout created in memory is not collected automatically.
+            if (_ownsLayout && _layout != null)
+            {
+                Destroy(_layout);
+                _layout = null;
+            }
+        }
+
+        #region Setup
 
         /// <summary>
-        /// Paneli yerine oturtur, katmanlari toplar ve etiketleri kurar.
+        /// Places the panel, collects the layers and builds the labels.
         ///
-        /// Awake yerine "ihtiyac aninda" cagrilabilir olmasi bilincli: panel calisma aninda
-        /// Instantiate edilip ayni karede SetField cagrilirsa Awake sirasina guvenmek kirilgan
-        /// olur. Konum sifirlamasi da burada — etiket capalari panelin NIHAI konumundan
-        /// hesaplandigi icin sirasi kaymamali.
+        /// Being callable "on demand" instead of only from Awake is deliberate: if the panel is instantiated
+        /// at runtime and SetField is called in the same frame, relying on Awake order would be fragile.
+        /// The position reset also happens here — label anchors are computed from the panel's FINAL
+        /// position, so the order must not change.
         /// </summary>
         private void EnsureBuilt()
         {
@@ -117,15 +160,21 @@ namespace Tavla.View
 
             _built = true;
 
-            // BoardManager ile ayni gerekce: "Create Empty"/prefab surukleme objeyi Scene
-            // view'in baktigi noktaya koydugu icin konumu zorla sifirliyoruz — aksi halde
-            // panel tahtadan kayar.
-            transform.position = Vector3.zero;
-            transform.rotation = Quaternion.identity;
-            transform.localScale = Vector3.one;
+            // Same reason as BoardManager: "Create Empty" / dragging a prefab places the object where the
+            // Scene view is looking, so we force the transform back — otherwise the panel drifts off the board.
+            if (transform.position != Vector3.zero || transform.rotation != Quaternion.identity ||
+                transform.localScale != Vector3.one)
+            {
+                Debug.LogWarning("[View] HudView was not at the origin; it was reset because the panel is " +
+                                 "authored in canvas space. Place the panel object at (0,0,0) to silence this.", this);
 
-            // SortingGroup importer tarafindan prefab KOKUNE eklenir. Bu bilesen ister o kokte
-            // olsun, ister prefab'i cocuk olarak tutan bir objede — ikisi de calissin.
+                transform.position = Vector3.zero;
+                transform.rotation = Quaternion.identity;
+                transform.localScale = Vector3.one;
+            }
+
+            // The importer adds the SortingGroup to the prefab ROOT. This component may sit on that root
+            // or on an object that holds the prefab as a child — both must work.
             SortingGroup group = GetComponentInChildren<SortingGroup>(true);
             if (group != null)
                 group.sortingOrder = _sortingOrder;
@@ -136,38 +185,39 @@ namespace Tavla.View
 
         private void CollectLayers()
         {
-            foreach (SpriteRenderer renderer in GetComponentsInChildren<SpriteRenderer>(true))
+            foreach (SpriteRenderer layerRenderer in GetComponentsInChildren<SpriteRenderer>(true))
             {
-                // Etiket glifleri de SpriteRenderer'dir; kendi urettiklerimizi katman sanmayalim.
-                if (renderer.GetComponentInParent<PixelLabel>() != null)
+                // Label glyphs are SpriteRenderers too; do not mistake our own ones for layers.
+                if (layerRenderer.GetComponentInParent<PixelLabel>() != null)
                     continue;
 
-                _layers[renderer.gameObject.name] = renderer;
+                _layers[layerRenderer.gameObject.name] = layerRenderer;
             }
 
             if (_layers.Count == 0)
-                Debug.LogError("[View] HudView altinda hic SpriteRenderer yok — panel bos. " +
-                               "Bu bilesen BOS bir GameObject'e degil, Project'ten sahneye " +
-                               "suruklenen general_info_scheme prefab'ina eklenmeli.", this);
+                Debug.LogError("[View] HudView has no SpriteRenderer children — the panel is empty. " +
+                               "Add this component to the general_info_scheme prefab dragged in from the " +
+                               "Project window, not to an EMPTY GameObject.", this);
         }
 
         /// <summary>
-        /// Her slot icin bir PixelLabel uretir.
+        /// Creates the value label of each slot and, if defined, its caption label.
         /// </summary>
         /// <param name="parent">
-        /// Etiketler SortingGroup'un ICINE konur: grup cocuklarini tek parca olarak siraladigi
-        /// icin disarida kalan bir yazi, panelin arkasina duser ya da tahtayi delip one cikar.
+        /// Labels go INSIDE the SortingGroup: the group sorts its children as one unit, so text left outside
+        /// would either fall behind the panel or poke through the board.
         /// </param>
         /// <param name="insideGroup">
-        /// Grup icindeysek sira GRUBA GOREDIR (0'dan baslar). Grup yoksa panel katmanlari
-        /// global sirada durur ve yazinin onlari gecmesi icin panel sirasi eklenmelidir.
+        /// Inside a group the order is RELATIVE TO THE GROUP (starts at 0). Without a group the panel layers
+        /// use global orders and the panel order must be added for the text to stay on top.
         /// </param>
         private void BuildLabels(Transform parent, bool insideGroup)
         {
             if (_layout == null)
             {
-                // Asset atanmadiysa varsayilan degerlerle bellekte bir tane uret (BoardManager ile ayni yol).
-                _layout = ScriptableObject.CreateInstance<BoardLayout>();
+                // No asset assigned: create one in memory with the default values (same path as BoardManager).
+                _layout = BoardLayout.CreateDefault();
+                _ownsLayout = true;
             }
 
             int sortingOrder = insideGroup ? _textSortingOrder : _sortingOrder + _textSortingOrder;
@@ -179,26 +229,54 @@ namespace Tavla.View
 
                 if (_labels.ContainsKey(slot.Field))
                 {
-                    Debug.LogWarning($"[View] HUD slotu iki kez tanimlanmis: {slot.Field}. " +
-                                     "Ikincisi yok sayildi.", this);
+                    Debug.LogWarning($"[View] HUD slot defined twice: {slot.Field}. " +
+                                     "The second one was ignored.", this);
                     continue;
                 }
 
-                GameObject go = new GameObject($"Label_{slot.Field}");
-                go.transform.SetParent(parent, false);
-                go.transform.position = GetSlotAnchor(slot);
+                int boxWidth;
+                Vector3 center = GetSlotBox(slot, out boxWidth);
 
-                PixelLabel label = go.AddComponent<PixelLabel>();
-                label.Configure(_layout.PixelsPerUnit, sortingLayerId, sortingOrder,
-                                slot.Color, slot.Align);
+                SlotLabels labels = new SlotLabels { InnerWidth = boxWidth - 2 * _boxPadding };
 
-                _labels.Add(slot.Field, label);
+                if (string.IsNullOrEmpty(slot.Caption))
+                {
+                    labels.Value = CreateLabel($"Label_{slot.Field}", parent, center, slot,
+                                               slot.Align, sortingLayerId, sortingOrder);
+                }
+                else
+                {
+                    // Caption hugs the left edge, value the right edge; both stay inside the box.
+                    Vector3 edge = Vector3.right * ((boxWidth * 0.5f - _boxPadding) / _layout.PixelsPerUnit);
+
+                    labels.Caption = CreateLabel($"Caption_{slot.Field}", parent, center - edge, slot,
+                                                 PixelTextAlign.Left, sortingLayerId, sortingOrder);
+                    labels.Caption.SetText(slot.Caption);
+
+                    labels.Value = CreateLabel($"Label_{slot.Field}", parent, center + edge, slot,
+                                               PixelTextAlign.Right, sortingLayerId, sortingOrder);
+                }
+
+                _labels.Add(slot.Field, labels);
             }
         }
 
+        private PixelLabel CreateLabel(string labelName, Transform parent, Vector3 position, HudSlot slot,
+                                       PixelTextAlign align, int sortingLayerId, int sortingOrder)
+        {
+            GameObject go = new GameObject(labelName);
+            go.transform.SetParent(parent, false);
+            go.transform.position = position;
+
+            PixelLabel label = go.AddComponent<PixelLabel>();
+            label.Configure(_layout.PixelsPerUnit, sortingLayerId, sortingOrder, slot.Color, align);
+
+            return label;
+        }
+
         /// <summary>
-        /// Yazilar panelin kendi siralama katmanina katilir. Panel ozel bir katmandaysa
-        /// (orn. "UI") yazinin "Default"ta kalmasi onu goze gorunmez yapardi.
+        /// Text joins the panel's own sorting layer. If the panel uses a custom layer
+        /// (e.g. "UI"), text left on "Default" would be invisible.
         /// </summary>
         private int GetPanelSortingLayerId()
         {
@@ -209,44 +287,50 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Slotun dunya konumu: once ayni isimli katmanin gorsel kutusunun merkezi,
-        /// o yoksa semadaki yedek piksel.
+        /// The slot's box: centre in world space and width in pixels. The visual box of the layer with the
+        /// same name is used first; if it does not exist, the fallback pixel from the scheme.
         ///
-        /// Katman kutusu transform'dan degil SPRITE'TAN okunur (sprite.bounds): Pivot Space
-        /// Canvas modunda her katmanin transform'u (0,0)'dadir, kutu bilgisi tamamen
-        /// sprite'in pivotunda saklidir.
+        /// The layer box is read from the SPRITE (sprite.bounds), not the transform: in Pivot Space = Canvas
+        /// mode every layer's transform sits at (0,0) and the box information lives entirely in the sprite's pivot.
         /// </summary>
-        private Vector3 GetSlotAnchor(HudSlot slot)
+        private Vector3 GetSlotBox(HudSlot slot, out int widthPixels)
         {
             float ppu = _layout.PixelsPerUnit;
 
-            // Aseprite'ta y ASAGI artar; BoardLayout.PixelToWorld ile ayni cevrim.
+            // In Aseprite y grows DOWN; same conversion as BoardLayout.PixelToWorld.
             Vector3 offset = new Vector3(slot.PixelOffset.x / ppu, -slot.PixelOffset.y / ppu, 0f);
 
             SpriteRenderer layer = FindLayer(slot.LayerName);
             if (layer != null && layer.sprite != null)
-                return layer.transform.TransformPoint(layer.sprite.bounds.center) + offset;
+            {
+                Bounds bounds = layer.sprite.bounds;
+                Vector3 min = layer.transform.TransformPoint(bounds.min);
+                Vector3 max = layer.transform.TransformPoint(bounds.max);
 
-            Debug.LogWarning($"[View] HUD katmani bulunamadi: \"{slot.LayerName}\" " +
-                             $"({slot.Field}). Yedek konum kullanildi. Paneldeki katmanlar: " +
+                widthPixels = Mathf.RoundToInt(Mathf.Abs(max.x - min.x) * ppu);
+                return layer.transform.TransformPoint(bounds.center) + offset;
+            }
+
+            Debug.LogWarning($"[View] HUD layer not found: \"{slot.LayerName}\" " +
+                             $"({slot.Field}). Using the fallback position. Layers on the panel: " +
                              string.Join(", ", _layers.Keys), this);
 
+            widthPixels = FallbackBoxWidth;
             return _layout.PixelToWorld(slot.FallbackPixel.x, slot.FallbackPixel.y) + offset;
         }
 
         /// <summary>
-        /// Katmani adiyla bulur. Once birebir, sonra buyuk/kucuk harf ve Turkce karakter
-        /// farklarini affeden bir arama — importer katman adlarini ("İnfo/Quit") dosya adina
-        /// uygun hale getirirken degistirebiliyor.
+        /// Finds a layer by name. First an exact match, then a search that tolerates case and special-character
+        /// differences — the importer may alter layer names (e.g. "İnfo/Quit") to make them file-name safe.
         /// </summary>
         private SpriteRenderer FindLayer(string layerName)
         {
             if (string.IsNullOrEmpty(layerName))
                 return null;
 
-            SpriteRenderer renderer;
-            if (_layers.TryGetValue(layerName, out renderer))
-                return renderer;
+            SpriteRenderer layerRenderer;
+            if (_layers.TryGetValue(layerName, out layerRenderer))
+                return layerRenderer;
 
             foreach (KeyValuePair<string, SpriteRenderer> pair in _layers)
             {
@@ -259,19 +343,22 @@ namespace Tavla.View
 
         #endregion
 
-        #region Değer yazma (HudPresenter -> panel)
+        #region Writing values (HudPresenter -> panel)
 
-        /// <summary>Bir slota metin yazar. Slot tanimli degilse sessizce gecilir.</summary>
+        /// <summary>Writes text into a slot. Silently ignored if the slot is not defined.</summary>
         public void SetField(HudField field, string text)
         {
             EnsureBuilt();
 
-            PixelLabel label;
-            if (_labels.TryGetValue(field, out label))
-                label.SetText(text);
+            SlotLabels labels;
+            if (!_labels.TryGetValue(field, out labels))
+                return;
+
+            labels.Value.SetText(text);
+            FitCaption(labels);
         }
 
-        /// <summary>Sayi yazmanin kisa yolu — cagiranlarin her yerde ToString() yazmamasi icin.</summary>
+        /// <summary>Shortcut for numbers — so callers do not have to write ToString() everywhere.</summary>
         public void SetField(HudField field, int value)
         {
             SetField(field, value.ToString());
@@ -283,25 +370,41 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Slotun etiketi — rengini degistirmek (orn. altin azalinca kirmizi) ya da
-        /// gizlemek icin. Yoksa null.
+        /// The slot's value label — to change its colour (e.g. red when gold runs low) or hide it.
+        /// Null if the slot does not exist.
         /// </summary>
         public PixelLabel GetLabel(HudField field)
         {
             EnsureBuilt();
 
-            PixelLabel label;
-            return _labels.TryGetValue(field, out label) ? label : null;
+            SlotLabels labels;
+            return _labels.TryGetValue(field, out labels) ? labels.Value : null;
+        }
+
+        /// <summary>
+        /// Hides the caption if caption and value do not fit side by side. The value is the real information;
+        /// the caption only reminds what the bar is. For long texts such as "6 6 6 6" on a double or the
+        /// match result, the box is left to the value; the caption returns once the value gets shorter.
+        /// </summary>
+        private void FitCaption(SlotLabels labels)
+        {
+            if (labels.Caption == null)
+                return;
+
+            int valueWidth = labels.Value.MeasuredWidth;
+            bool fits = valueWidth == 0 ||
+                        labels.Caption.MeasuredWidth + _captionGap + valueWidth <= labels.InnerWidth;
+
+            labels.Caption.SetVisible(fits);
         }
 
         #endregion
 
-        #region Katmanlar
+        #region Layers
 
         /// <summary>
-        /// Bir katmanin renderer'ini adiyla verir — avatari degistirmek, bir seridi gizlemek
-        /// ya da uzerine collider koymak icin.
-        /// Ad, Aseprite'taki katman adidir ("Avatari", "Gold", "İnfo/Quit"...).
+        /// Returns a layer's renderer by name — to swap the avatar, hide a strip or put a collider on it.
+        /// The name is the Aseprite layer name ("Avatari", "Gold", "İnfo/Quit"...).
         /// </summary>
         public SpriteRenderer GetLayer(string layerName)
         {
@@ -309,20 +412,23 @@ namespace Tavla.View
             return FindLayer(layerName);
         }
 
-        /// <summary>Avatari calisma aninda degistirir (karakter secimi icin).</summary>
+        /// <summary>Name of the avatar layer in the Aseprite file.</summary>
+        private const string AvatarLayerName = "Avatari";
+
+        /// <summary>Swaps the avatar at runtime (for character selection).</summary>
         public void SetAvatar(Sprite avatar)
         {
-            SpriteRenderer renderer = GetLayer("Avatari");
-            if (renderer != null)
-                renderer.sprite = avatar;
+            SpriteRenderer avatarRenderer = GetLayer(AvatarLayerName);
+            if (avatarRenderer != null)
+                avatarRenderer.sprite = avatar;
         }
 
-        /// <summary>Bir katmani gosterir/gizler.</summary>
+        /// <summary>Shows/hides a layer.</summary>
         public void SetLayerVisible(string layerName, bool visible)
         {
-            SpriteRenderer renderer = GetLayer(layerName);
-            if (renderer != null)
-                renderer.enabled = visible;
+            SpriteRenderer layerRenderer = GetLayer(layerName);
+            if (layerRenderer != null)
+                layerRenderer.enabled = visible;
         }
 
         #endregion

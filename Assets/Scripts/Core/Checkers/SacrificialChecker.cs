@@ -5,11 +5,11 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Fedakar Pul. "Rakip bu pulu kirdiginda pul bara gitmez, YOK OLUR.
-    /// Ancak dukkandaki tum esyalarin fiyatini kalici olarak 2 altin ucuzlatir."
-    /// Iki farkli sorumluluk, iki farkli arayuz:
-    ///   ICustomCaptureDestination -> NEREYE gidecegi
-    ///   ICaptureReactor           -> YAN ETKISI ne olacagi
+    /// Sacrificial Checker. "When the opponent captures this checker it does not go to the bar, it is DESTROYED.
+    /// In exchange every item in the shop becomes permanently 2 gold cheaper."
+    /// Two responsibilities, two interfaces:
+    ///   <see cref="ICustomCaptureDestination"/> -> WHERE it goes
+    ///   <see cref="ICaptureReactor"/>           -> what the SIDE EFFECT is
     /// </summary>
     public class SacrificialChecker : BaseChecker, ICustomCaptureDestination, ICaptureReactor, IPermanent
     {
@@ -23,14 +23,14 @@ namespace Tavla.Core.Checkers
         public void OnCaptured(IMatchContext context, int capturedByPlayerId, int nodeIndex)
         {
             context.AddShopDiscount(DiscountAmount);
-            context.Board.ReportAbility("SacrificeDiscount", this, nodeIndex);
+            context.Board.ReportAbility(AbilityIds.SacrificeDiscount, this, nodeIndex);
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Fedakar Pul";
+        public string DisplayName => "Sacrificial Checker";
         public int Price => 150;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public SacrificialChecker(int ownerId) : base(ownerId) { }

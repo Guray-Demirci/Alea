@@ -1,12 +1,14 @@
 namespace Tavla.Core.Abilities
 {
-    /// <summary>Kirilmaya karsi bagisiklik. Zirhli Pul (kalici) ve tek kullanimlik kalkan varyantlari kullanir.</summary>
+    /// <summary>
+    /// Immunity to being captured. Used by the Armored Checker (permanent) and by single-use shield variants.
+    /// </summary>
     public interface ICaptureImmunity : ICheckerAbility
     {
-        /// <summary>Su an bagisiklik aktif mi? (Saf sorgu, yan etkisi olmamali.)</summary>
+        /// <summary>Is the immunity currently active? (Pure query — must have no side effects.)</summary>
         bool IsImmune { get; }
 
-        /// <summary>Bagisiklik bir saldiriyi savusturdugunda cagrilir. Kalici zirhta bos gecilir.</summary>
+        /// <summary>Called when the immunity deflected an attack. A no-op for permanent armor.</summary>
         void OnImmunityTriggered();
     }
 }

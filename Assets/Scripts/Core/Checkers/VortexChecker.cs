@@ -4,9 +4,9 @@ using Tavla.Core.Interfaces;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Kara Delik Pulu (Vortex). "Hanenin pul sinirini kaldirir; kendi rengindeki
-    /// tum pullari tek hanede toplayip devasa bir SUPER KAPI olusturabilirsin."
-    /// Kapasite kurali artik sabit degil, hanede duran pullara sorulan bir soruya donustu.
+    /// Vortex Checker. "Removes the checker limit of its point; you can gather every checker of your
+    /// colour on a single point and build a massive SUPER POINT."
+    /// Capacity is no longer a fixed rule but a question asked of the checkers standing on the point.
     /// </summary>
     public class VortexChecker : BaseChecker, IStackLimitOverride, IPermanent
     {
@@ -14,14 +14,14 @@ namespace Tavla.Core.Checkers
 
         public override string TypeId => Id;
 
-        /// <summary>Sinir tamamen kalkar. Sisli Hane'de bu yetenek duser ve limit geri gelir.</summary>
+        /// <summary>The limit is removed entirely. Inside a Fog Tile this ability drops and the limit returns.</summary>
         public int GetStackLimit(int defaultLimit) => int.MaxValue;
 
         public string ItemId => Id;
-        public string DisplayName => "Kara Delik Pulu";
+        public string DisplayName => "Vortex Checker";
         public int Price => 850;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public VortexChecker(int ownerId) : base(ownerId) { }

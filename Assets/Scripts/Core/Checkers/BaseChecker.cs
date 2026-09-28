@@ -4,28 +4,28 @@ using Tavla.Core.Abilities;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// Tahtadaki her pulun ortak iskeleti. SAF C# — Unity'den haberi yoktur.
-    /// Bilincli olarak "ince" tutuldu: 18 ozel pulun hicbir yetenegi buraya EKLENMEZ.
-    /// Yetenekler ICheckerAbility arayuzleriyle kompozisyon olarak takilir.
+    /// Common skeleton of every checker on the board. PURE C# — it knows nothing about Unity.
+    /// Intentionally kept "thin": none of the 18 special abilities is ADDED here.
+    /// Abilities are attached through composition via <see cref="ICheckerAbility"/> interfaces.
     ///
-    /// Kalitim derinligi her zaman 2'dir: BaseChecker -> SomutPul. Zincir hic uzamaz;
-    /// cesitlilik "hangi arayuzleri uyguladigindan" gelir.
+    /// The inheritance depth is always 2: BaseChecker -> ConcreteChecker. The chain never grows;
+    /// variety comes from "which interfaces it implements".
     /// </summary>
     public abstract class BaseChecker
     {
-        /// <summary>Pulun sahibi (0 veya 1).</summary>
+        /// <summary>Owner of the checker (0 or 1).</summary>
         public int OwnerId { get; private set; }
 
-        /// <summary>Pul tipinin kimligi. View bu degere bakarak dogru prefab'i sahneye basar.</summary>
+        /// <summary>Identifier of the checker type. The View uses it to spawn the right visual.</summary>
         public abstract string TypeId { get; }
 
         /// <summary>
-        /// Sisli Hane bu bayragi acar. Acikken GetAbility her zaman null doner,
-        /// yani pul gecici olarak DefaultChecker gibi davranir.
+        /// Set by the Fog Tile. While set, GetAbility always returns null,
+        /// i.e. the checker temporarily behaves like a DefaultChecker.
         /// </summary>
         public bool AbilitiesSuppressed { get; private set; }
 
-        /// <summary>Pul kirildiginda tetiklenir (View animasyonu icin).</summary>
+        /// <summary>Raised when the checker is captured (for View animations).</summary>
         public event Action<BaseChecker> Captured;
 
         protected BaseChecker(int ownerId)
@@ -34,11 +34,11 @@ namespace Tavla.Core.Checkers
         }
 
         /// <summary>
-        /// YETENEK KAPISI — mimarinin kalbi.
-        /// GameState hicbir yerde "if (checker is ZirhliPul)" yazmaz; bunun yerine
-        /// "bu pulda X yetenegi var mi?" diye sorar. Sis efekti de tek satirda burada uygulanir.
+        /// ABILITY GATE — the heart of the architecture.
+        /// GameState never writes "if (checker is ArmoredChecker)"; instead it asks
+        /// "does this checker have ability X?". The Fog effect is applied here in a single line.
         /// </summary>
-        /// <returns>Yetenek varsa kendisi, yoksa veya bastirilmissa null.</returns>
+        /// <returns>The ability if present, otherwise (or if suppressed) null.</returns>
         public T GetAbility<T>() where T : class, ICheckerAbility
         {
             if (AbilitiesSuppressed)
@@ -47,15 +47,15 @@ namespace Tavla.Core.Checkers
             return this as T;
         }
 
-        /// <summary>Sisli Hane giris/cikisinda GameState tarafindan cagrilir.</summary>
-        public void SetAbilitiesSuppressed(bool suppressed)
+        /// <summary>Called by the Fog Tile when a checker enters or leaves it.</summary>
+        internal void SetAbilitiesSuppressed(bool suppressed)
         {
             AbilitiesSuppressed = suppressed;
         }
 
         /// <summary>
-        /// Bu pul kirilabilir mi? Artik override edilmez — cevap yeteneklerden gelir.
-        /// Boylece Sis icindeyken Zirhli Pul da kirilabilir hale gelir (dokumandaki kural).
+        /// Can this checker be captured? No longer overridden — the answer comes from abilities.
+        /// That is how an Armored Checker becomes capturable inside the Fog (as designed).
         /// </summary>
         public bool CanBeCaptured
         {
@@ -66,13 +66,13 @@ namespace Tavla.Core.Checkers
             }
         }
 
-        /// <summary>Pul kirildigi ANDA GameState tarafindan cagrilir.</summary>
+        /// <summary>Called by GameState at the MOMENT the checker is captured.</summary>
         public virtual void OnCaptured(int capturedByPlayerId)
         {
             Captured?.Invoke(this);
         }
 
-        /// <summary>Yardimci: Verilen oyuncuya gore bu pul dusman mi?</summary>
+        /// <summary>Helper: is this checker an enemy of the given player?</summary>
         public bool IsEnemyOf(int playerId) => OwnerId != playerId;
     }
 }

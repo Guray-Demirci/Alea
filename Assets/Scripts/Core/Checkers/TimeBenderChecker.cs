@@ -6,8 +6,8 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Zaman Buken Pul. "Her oynattiginda %50 ihtimalle rakibin turunu pas gecirirsin,
-    /// %50 ihtimalle hicbir sey olmaz."
+    /// Time Bender Checker. "Every time you move it there is a 50% chance the opponent's turn is skipped,
+    /// and a 50% chance that nothing happens."
     /// </summary>
     public class TimeBenderChecker : BaseChecker, IMoveReactor, IPermanent
     {
@@ -26,14 +26,14 @@ namespace Tavla.Core.Checkers
 
             int opponentId = (OwnerId + 1) % GameState.PlayerCount;
             context.SkipTurn(opponentId);
-            context.Board.ReportAbility("TimeBend", this, result.ToIndex);
+            context.Board.ReportAbility(AbilityIds.TimeBend, this, result.ToIndex);
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Zaman Büken Pul";
+        public string DisplayName => "Time Bender Checker";
         public int Price => 550;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public TimeBenderChecker(int ownerId) : base(ownerId) { }

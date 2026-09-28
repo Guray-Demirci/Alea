@@ -6,9 +6,9 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Sabitleyici Pul (Anchor). "Hareket ettirildiginde, bir sonraki el atacagin iki zardan
-    /// birini kesin olarak o el ilerledigi hane sayisina sabitler. Sansi tamamen ortadan kaldirir."
-    /// Zar sistemine pul uzerinden dokunan tek ornek; kopru IMatchContext.PinNextDie.
+    /// Anchor Checker. "When moved, one of the two dice of your next roll is pinned to the number
+    /// of points it moved. Removes luck entirely."
+    /// The only checker that touches the dice system; the bridge is <see cref="IMatchContext.PinNextDie"/>.
     /// </summary>
     public class AnchorChecker : BaseChecker, IMoveReactor, IPermanent
     {
@@ -25,19 +25,19 @@ namespace Tavla.Core.Checkers
             if (distance < 0)
                 distance = -distance;
 
-            // Bardan giris gibi uc durumlarda gecersiz deger sabitlemeyelim.
+            // Do not pin an invalid value in edge cases such as entering from the bar.
             if (distance < 1 || distance > GameState.MaxDieValue)
                 return;
 
             context.PinNextDie(OwnerId, distance);
-            context.Board.ReportAbility("AnchorPin", this, result.ToIndex);
+            context.Board.ReportAbility(AbilityIds.AnchorPin, this, result.ToIndex);
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Sabitleyici Pul";
+        public string DisplayName => "Anchor Checker";
         public int Price => 620;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public AnchorChecker(int ownerId) : base(ownerId) { }

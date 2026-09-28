@@ -6,10 +6,10 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// C6 - Tahta Kazik Hanesi (The Spike Pit). "Bu haneye basan her pul aninda kirilir ve bara sutlanir.
-    /// Buradan sadece Zirhli Pul gibi ozel pullar hasar almadan gecebilir — kazigi kirar
-    /// ve haneyi normal karoya donusturur."
-    /// Somut sinifi degil YETENEGI sorguluyoruz: ileride bagisiklik kazanan her pul otomatik olarak gecebilir.
+    /// Spike Pit Tile. "Every checker that lands here is instantly captured and kicked to the bar.
+    /// Only special checkers such as the Armored Checker can pass unharmed — they break the spikes
+    /// and turn the point back into a normal one."
+    /// We query the ABILITY, not the concrete class: any checker that gains immunity later can pass automatically.
     /// </summary>
     public class SpikePitTile : BaseTileEffect
     {
@@ -19,7 +19,7 @@ namespace Tavla.Core.Tiles
 
         public override string EffectId => Id;
 
-        /// <summary>Kazik kirildiysa karo tukenmistir; GameState onu haneden temizler.</summary>
+        /// <summary>Once the spikes are broken the tile has expired; GameState removes it from the point.</summary>
         public override bool IsExpired => _broken;
 
         public override void OnCheckerLanded(IMatchContext context, Node node, BaseChecker checker)
@@ -29,11 +29,11 @@ namespace Tavla.Core.Tiles
             if (immunity != null && immunity.IsImmune)
             {
                 _broken = true;
-                context.Board.ReportAbility("SpikeBroken", checker, node.Index);
+                context.Board.ReportAbility(AbilityIds.SpikeBroken, checker, node.Index);
                 return;
             }
 
-            context.Board.ReportAbility("SpikeHit", checker, node.Index);
+            context.Board.ReportAbility(AbilityIds.SpikeHit, checker, node.Index);
             context.Board.ForceCapture(checker, node.Index, OpponentOf(checker));
         }
     }

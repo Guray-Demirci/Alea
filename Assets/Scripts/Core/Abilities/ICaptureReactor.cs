@@ -3,9 +3,9 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Abilities
 {
     /// <summary>
-    /// Pul KIRILDIGINDA tetiklenir. Nereye gidecegini degil, YAN ETKISINI belirler:
-    /// Fedakar Pul dukkani ucuzlatir, Anka Pulu luks vitrini acar.
-    /// (Gidecegi yer ayri bir sorumluluktur -> ICustomCaptureDestination.)
+    /// Fired when the checker is CAPTURED. Defines the SIDE EFFECT, not the destination:
+    /// the Sacrificial Checker discounts the shop, the Phoenix Checker opens the luxury shop.
+    /// (The destination is a separate responsibility -> <see cref="ICustomCaptureDestination"/>.)
     /// </summary>
     public interface ICaptureReactor : ICheckerAbility
     {

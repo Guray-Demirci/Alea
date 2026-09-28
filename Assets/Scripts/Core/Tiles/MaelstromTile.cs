@@ -1,3 +1,4 @@
+using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
 using Tavla.Core.Runtime;
@@ -5,16 +6,16 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// C3 - Girdap Hanesi (The Maelstrom). "Bu haneye basan pul, akintiya kapilarak rastgele
-    /// bir haneye firlatilir. Firlatildigi hanede rakibin kapisi varsa pul direkt kirilir ve bara gider."
+    /// Maelstrom Tile. "A checker that lands here is caught by the current and flung to a random point.
+    /// If the opponent holds that point, the checker is captured and sent to the bar."
     /// </summary>
     public class MaelstromTile : BaseTileEffect
     {
         public const string Id = "tile_maelstrom";
 
         /// <summary>
-        /// Yeniden giris kilidi. Iki girdap birbirine pul firlatirsa sonsuz dongu olusur;
-        /// TeleportChecker hedefteki karonun OnCheckerLanded'ini da tetikledigi icin bu sart.
+        /// Re-entrancy guard. Two maelstroms flinging checkers at each other would loop forever;
+        /// needed because TeleportChecker also fires OnCheckerLanded of the destination tile.
         /// </summary>
         private bool _resolving;
 
@@ -29,10 +30,10 @@ namespace Tavla.Core.Tiles
             try
             {
                 int destination = PickDestination(context, node.Index);
-                context.Board.ReportAbility("MaelstromPull", checker, node.Index);
+                context.Board.ReportAbility(AbilityIds.MaelstromPull, checker, node.Index);
                 context.Board.TeleportChecker(checker, node.Index, destination);
 
-                // Firlatildigi yerde rakip kapisi varsa pul kirilir.
+                // If the opponent holds the point it was flung to, the checker is captured.
                 Node landed = context.Board.Nodes[destination];
                 if (landed.IsBlockedFor(checker.OwnerId))
                     context.Board.ForceCapture(checker, destination, OpponentOf(checker));
@@ -43,12 +44,12 @@ namespace Tavla.Core.Tiles
             }
         }
 
-        /// <summary>Girdabin kendi hanesi haric rastgele bir hane secer.</summary>
+        /// <summary>Picks a random point other than the maelstrom's own point.</summary>
         private static int PickDestination(IMatchContext context, int currentIndex)
         {
             int destination = context.Random.Range(0, GameState.NodeCount - 1);
 
-            // Kendi hanesini atla: [0, N-1) araligindan secip kaydirarak tekrar denemeye gerek kalmiyor.
+            // Skip its own point: picking from [0, N-1) and shifting avoids re-rolling.
             if (destination >= currentIndex)
                 destination++;
 

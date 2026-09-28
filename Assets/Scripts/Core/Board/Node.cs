@@ -6,11 +6,15 @@ using Tavla.Core.Interfaces;
 namespace Tavla.Core.Board
 {
     /// <summary>
-    /// Tahtadaki tek bir hane. Pullari LIFO (yigin) mantigiyla tutar.
+    /// A single point on the board. Holds checkers as a LIFO stack.
     ///
-    /// ONEMLI DEGISIKLIK: Parazit Pul rakip kapisina sizabildigi icin bir hane artik
-    /// AYNI ANDA IKI OYUNCUNUN pulunu barindirabilir. Bu yuzden "OwnerId" tek basina
-    /// yeterli degil; kural hesaplari oyuncu bazli sayimlar uzerinden yapilir.
+    /// IMPORTANT: the Parasite Checker can infiltrate enemy points, so a point may hold
+    /// checkers of BOTH PLAYERS at the same time. "OwnerId" alone is therefore not enough;
+    /// rule calculations use per-player counts.
+    ///
+    /// Mutators are <c>internal</c>: only Core may change the board. GameState routes every
+    /// removal through its tile hooks, and bypassing that path from outside would leave
+    /// tiles holding stale per-checker state.
     /// </summary>
     public class Node
     {
@@ -22,15 +26,15 @@ namespace Tavla.Core.Board
 
         public IReadOnlyList<BaseChecker> Checkers => _checkers;
 
-        public int StoneCount => _checkers.Count;
+        public int CheckerCount => _checkers.Count;
 
         /// <summary>
-        /// Haneyi "tutan" oyuncu = en alttaki pulun sahibi.
-        /// Parazit sizsa bile hanenin asil sahibi degismez; sadece bir misafir vardir.
+        /// The player who "holds" the point = owner of the bottom checker.
+        /// A Parasite infiltration does not change the real owner; it is only a guest.
         /// </summary>
         public int OwnerId => _checkers.Count == 0 ? EmptyOwner : _checkers[0].OwnerId;
 
-        /// <summary>Bu hanede kurulu ozel karo (yoksa null).</summary>
+        /// <summary>Special tile installed on this point (null if none).</summary>
         public ITileEffect ActiveTile { get; private set; }
 
         public BaseChecker TopChecker => _checkers.Count == 0 ? null : _checkers[_checkers.Count - 1];
@@ -42,9 +46,9 @@ namespace Tavla.Core.Board
             Index = index;
         }
 
-        #region Sayim / sorgu
+        #region Counting / queries
 
-        /// <summary>Verilen oyuncunun bu hanedeki pul sayisi.</summary>
+        /// <summary>Number of the given player's checkers on this point.</summary>
         public int CountFor(int playerId)
         {
             int count = 0;
@@ -56,10 +60,10 @@ namespace Tavla.Core.Board
             return count;
         }
 
-        /// <summary>Verilen oyuncuya gore dusman pul sayisi.</summary>
+        /// <summary>Number of enemy checkers from the given player's perspective.</summary>
         public int CountEnemiesOf(int playerId) => _checkers.Count - CountFor(playerId);
 
-        /// <summary>Verilen oyuncuya gore en ustteki dusman pul (kirma hedefi). Yoksa null.</summary>
+        /// <summary>Topmost enemy checker from the given player's perspective (the capture target). Null if none.</summary>
         public BaseChecker GetTopEnemyOf(int playerId)
         {
             for (int i = _checkers.Count - 1; i >= 0; i--)
@@ -70,7 +74,7 @@ namespace Tavla.Core.Board
             return null;
         }
 
-        /// <summary>Verilen oyuncunun bu hanedeki tum dusman pullarini toplar (Kiyamet Pulu icin).</summary>
+        /// <summary>Collects every enemy checker on this point for the given player (used by the Doomsday Checker).</summary>
         public List<BaseChecker> GetEnemiesOf(int playerId)
         {
             List<BaseChecker> enemies = new List<BaseChecker>();
@@ -83,10 +87,10 @@ namespace Tavla.Core.Board
         }
 
         /// <summary>
-        /// Bu hane verilen oyuncuya kapali mi?
-        /// Uc sebep: (1) rakibin 2+ pulu var, (2) Zirhli Pul tek basina kapi sayiyor,
-        /// (3) tek rakip pulu kirilamaz durumda.
-        /// Yetenekler GetAbility ile sorgulandigi icin Sis icindeyken hepsi otomatik devre disi kalir.
+        /// Is this point closed to the given player?
+        /// Three reasons: (1) the opponent has 2+ checkers, (2) an Armored Checker counts as a point on its own,
+        /// (3) the single enemy checker cannot be captured.
+        /// Abilities are queried through GetAbility, so they are all disabled automatically inside Fog.
         /// </summary>
         public bool IsBlockedFor(int playerId)
         {
@@ -94,7 +98,7 @@ namespace Tavla.Core.Board
             if (enemyCount == 0)
                 return false;
 
-            // Zindan karosu kapaliyken hanede kapi kurulamaz -> blokaj da olusmaz.
+            // While the Dungeon tile is closed no point can be made here -> no blockade either.
             bool blockadeAllowed = ActiveTile == null || ActiveTile.AllowsBlockade;
 
             if (enemyCount >= 2)
@@ -106,13 +110,13 @@ namespace Tavla.Core.Board
             if (solo != null && solo.FormsBlockadeAlone && blockadeAllowed)
                 return true;
 
-            // Tek pul ama kirilamiyorsa (Zirhli) yine gecilemez.
+            // A single checker that cannot be captured (Armored) still cannot be passed.
             return !enemy.CanBeCaptured;
         }
 
         /// <summary>
-        /// Hanenin gecerli pul kapasitesi. Kara Delik Pulu bu siniri kaldirir.
-        /// Hanedeki HERHANGI bir pulun yetenegi limiti gevsetebilir.
+        /// Effective checker capacity of this point. The Vortex Checker removes the limit.
+        /// The ability of ANY checker on the point may relax the limit.
         /// </summary>
         public int GetStackLimit(int defaultLimit)
         {
@@ -120,11 +124,11 @@ namespace Tavla.Core.Board
 
             for (int i = 0; i < _checkers.Count; i++)
             {
-                IStackLimitOverride ovr = _checkers[i].GetAbility<IStackLimitOverride>();
-                if (ovr == null)
+                IStackLimitOverride limitOverride = _checkers[i].GetAbility<IStackLimitOverride>();
+                if (limitOverride == null)
                     continue;
 
-                int candidate = ovr.GetStackLimit(defaultLimit);
+                int candidate = limitOverride.GetStackLimit(defaultLimit);
                 if (candidate > limit)
                     limit = candidate;
             }
@@ -134,14 +138,14 @@ namespace Tavla.Core.Board
 
         #endregion
 
-        #region Degistiriciler
+        #region Mutators (Core only)
 
-        public void Push(BaseChecker checker)
+        internal void Push(BaseChecker checker)
         {
             _checkers.Add(checker);
         }
 
-        public BaseChecker Pop()
+        internal BaseChecker Pop()
         {
             if (_checkers.Count == 0)
                 return null;
@@ -151,18 +155,18 @@ namespace Tavla.Core.Board
             return top;
         }
 
-        /// <summary>Belirli bir pulu haneden cikarir (Kiyamet, Kazik, Girdap gibi hedefli etkiler icin).</summary>
-        public bool Remove(BaseChecker checker)
+        /// <summary>Removes a specific checker (for targeted effects such as Doomsday, Spike Pit, Maelstrom).</summary>
+        internal bool Remove(BaseChecker checker)
         {
             return _checkers.Remove(checker);
         }
 
-        public void SetTile(ITileEffect effect)
+        internal void SetTile(ITileEffect effect)
         {
             ActiveTile = effect;
         }
 
-        public void ClearTile()
+        internal void ClearTile()
         {
             ActiveTile = null;
         }

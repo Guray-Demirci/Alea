@@ -4,31 +4,33 @@ using Tavla.Core.Checkers;
 namespace Tavla.View
 {
     /// <summary>
-    /// Sahnedeki tek bir pulun gorsel temsilcisi + surukle-birak girdisi.
+    /// Visual representative of a single checker in the scene + drag-and-drop input.
     ///
-    /// APTAL KUKLA SOZLESMESI — bu script:
-    ///   • Mesafe hesaplamaz, hane dolulugu sorgulamaz, sira kimde bakmaz.
-    ///   • Birakildigi anda kendi konumunu ASLA kendisi belirlemez.
-    ///   • Tek yaptigi: "su haneden su haneye gitmek istiyorum" deyip Core'a sormak.
-    /// Hamle gecerliyse de gecersizse de yeni konum Core'dan gelen event ile atanir.
-    /// Bu yuzden gecersiz hamlede "geri sicrama" kodu yazmaya gerek yoktur; kendiliginden olur.
+    /// DUMB PUPPET CONTRACT — this script:
+    ///   • never computes distances, never checks point occupancy, never checks whose turn it is,
+    ///   • NEVER decides its own position when dropped,
+    ///   • only says "I want to go from this point to that point" and asks Core.
+    /// Whether the move is legal or not, the new position is assigned through Core's events.
+    /// That is why no "bounce back" code is needed for illegal moves; it happens by itself.
+    ///
+    /// Mouse callbacks (OnMouseDown/Drag/Up) work with both the legacy Input Manager and the
+    /// Input System package on Unity 6.4+; the pointer position is read through <see cref="InputAdapter"/>.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(BoxCollider2D))]
     public class CheckerController : MonoBehaviour
     {
-        [Header("Hareket")]
-        [Tooltip("Hedefe kayma hızı (birim/saniye).")]
+        [Header("Movement")]
+        [Tooltip("Speed at which the checker glides to its target (units/second).")]
         [SerializeField] private float _moveSpeed = 14f;
 
-        [Header("Sürükleme")]
-        [Tooltip("Sürüklerken diğer pulların üstünde görünmesi için eklenen sıralama değeri.")]
-        [SerializeField] private int _dragSortingBoost = 500;
+        [Header("Dragging")]
+        [Tooltip("Added to the sorting order while dragging so the checker is drawn above the others.")]
+        [SerializeField] private int _dragSortingBoost = SortingOrders.DragBoost;
 
         private BoardManager _board;
         private BaseChecker _model;
         private SpriteRenderer _renderer;
-        private BoxCollider2D _collider;
         private Camera _camera;
 
         private Vector3 _targetPosition;
@@ -36,18 +38,21 @@ namespace Tavla.View
         private int _restingSortingOrder;
         private bool _isDragging;
 
+        // Reused for the drop query so releasing a checker does not allocate. Sized for the worst case:
+        // all 30 checkers stacked under the pointer plus the point collider — a smaller buffer could
+        // truncate the results and silently drop the NodeView we are looking for.
+        private static readonly Collider2D[] DropHits = new Collider2D[32];
 
-        /// <summary>Bu gorselin temsil ettigi Core nesnesi. View bunu SADECE kimlik olarak kullanir.</summary>
+        /// <summary>The Core object this visual represents. The View uses it ONLY as an identity.</summary>
         public BaseChecker Model => _model;
 
         private void Awake()
         {
             _renderer = GetComponent<SpriteRenderer>();
-            _collider = GetComponent<BoxCollider2D>();
             _camera = Camera.main;
         }
 
-        /// <summary>BoardManager pulu sahneye basarken cagirir.</summary>
+        /// <summary>Called by BoardManager when it spawns the checker.</summary>
         public void Bind(BoardManager board, BaseChecker model, Color color)
         {
             _board = board;
@@ -56,16 +61,16 @@ namespace Tavla.View
             if (_renderer == null)
                 _renderer = GetComponent<SpriteRenderer>();
 
-            // NOT: Kaynak sprite BEYAZ olmali. checker_scheme.aseprite siyah siluet oldugu icin
-            // tint carpma ile calismaz (siyah x herhangi bir renk = siyah).
+            // NOTE: the source sprite must be WHITE. checker_scheme.aseprite is a black silhouette, so
+            // tinting does not work with it (black x any colour = black).
             _renderer.color = color;
 
             gameObject.name = $"Checker_{model.TypeId}_P{model.OwnerId}";
         }
 
         /// <summary>
-        /// Yeni dinlenme konumu. SADECE BoardManager, Core'dan event geldiginde cagirir.
-        /// Surukleme sirasinda gelen cagrilar hedefi gunceller ama gorsel takibi bozmaz.
+        /// New resting position. ONLY BoardManager calls this, when Core raises an event.
+        /// Calls during a drag update the target but do not interrupt the visual following the pointer.
         /// </summary>
         public void SetTarget(Vector3 position, int sortingOrder)
         {
@@ -76,7 +81,7 @@ namespace Tavla.View
                 _renderer.sortingOrder = sortingOrder;
         }
 
-        /// <summary>Animasyonsuz aninda yerlestirme (ilk kurulum icin).</summary>
+        /// <summary>Instant placement without animation (for the initial setup).</summary>
         public void SnapToTarget()
         {
             transform.position = _targetPosition;
@@ -84,7 +89,7 @@ namespace Tavla.View
 
         private void Update()
         {
-            // Suruklenirken fare komutu gecerlidir; diger her an hedefe dogru kayariz.
+            // While dragging the pointer is in charge; at any other time we glide towards the target.
             if (_isDragging)
                 return;
 
@@ -92,7 +97,7 @@ namespace Tavla.View
                 transform.position, _targetPosition, _moveSpeed * Time.deltaTime);
         }
 
-        #region Surukle-Birak
+        #region Drag and drop
 
         private void OnMouseDown()
         {
@@ -101,13 +106,13 @@ namespace Tavla.View
 
             _isDragging = true;
 
-            // Fareyle pulun merkezi arasindaki farki koru ki pul kenarindan tutunca ziplamasin.
+            // Keep the offset between the pointer and the checker's centre so it does not jump when grabbed at the edge.
             _grabOffset = transform.position - GetPointerWorldPosition();
 
             _renderer.sortingOrder = _restingSortingOrder + _dragSortingBoost;
 
-            // Nereye gidebilecegini CORE'a sorup vurgulat. View kural hesaplamiyor,
-            // sadece Core'un verdigi listeyi boyuyor.
+            // Ask CORE where it may go and highlight that. The View computes no rules,
+            // it only paints the list Core returns.
             _board.ShowLegalTargets(_board.GetSourceIndex(_model));
         }
 
@@ -133,19 +138,19 @@ namespace Tavla.View
 
             if (target == null)
             {
-                // Tahta disina birakildi: Core'a hic sormuyoruz, hamle denemesi bile degil.
-                // Konumu yine de Core'un durumundan tazeliyoruz ki elle tasinmis gorsel kalmasin.
+                // Dropped outside the board: we do not ask Core at all, it is not even a move attempt.
+                // The position is still refreshed from Core's state so no hand-moved visual is left behind.
                 _board.RefreshBoard();
                 return;
             }
 
-            // Kaynak indeksi de MODELDEN soruyoruz — pul kendi nerede oldugunu bilmez.
+            // The source index also comes from the MODEL — the checker does not know where it is.
             int fromIndex = _board.GetSourceIndex(_model);
 
             _board.RequestMove(fromIndex, target.NodeIndex);
 
-            // Buradan sonra hicbir sey yapmiyoruz. Kabul de edilse ret de edilse
-            // yeni konum OnMoveExecuted / OnMoveRejected event'i uzerinden gelecek.
+            // Nothing else happens here. Accepted or rejected, the new position arrives
+            // through the MoveExecuted / MoveRejected events.
         }
 
         private Vector3 GetPointerWorldPosition()
@@ -153,23 +158,27 @@ namespace Tavla.View
             if (_camera == null)
                 _camera = Camera.main;
 
-            Vector3 screen = Input.mousePosition;
-            screen.z = -_camera.transform.position.z; // Ortografik kamerada duzleme izdusum
+            Vector3 screen = InputAdapter.PointerScreenPosition;
+            screen.z = -_camera.transform.position.z; // Project onto the board plane (orthographic camera).
 
             Vector3 world = _camera.ScreenToWorldPoint(screen);
             world.z = 0f;
             return world;
         }
 
-        /// <summary>Fare imlecinin altindaki hane. Bulamazsa null.</summary>
+        /// <summary>The point under the pointer. Null if there is none.</summary>
         private NodeView FindNodeUnderPointer()
         {
             Vector3 world = GetPointerWorldPosition();
-            Collider2D[] hits = Physics2D.OverlapPointAll(world);
 
-            for (int i = 0; i < hits.Length; i++)
+            ContactFilter2D filter = new ContactFilter2D();
+            filter.useTriggers = true; // Point colliders are triggers.
+
+            int hitCount = Physics2D.OverlapPoint(world, filter, DropHits);
+
+            for (int i = 0; i < hitCount; i++)
             {
-                NodeView node = hits[i].GetComponent<NodeView>();
+                NodeView node = DropHits[i].GetComponent<NodeView>();
                 if (node != null)
                     return node;
             }

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Tavla.View
 {
-    /// <summary>Metnin capa noktasina gore hizalanmasi.</summary>
+    /// <summary>Alignment of the text relative to its anchor point.</summary>
     public enum PixelTextAlign
     {
         Left,
@@ -12,37 +12,37 @@ namespace Tavla.View
     }
 
     /// <summary>
-    /// PixelFont ile tek satirlik metin basan etiket.
+    /// Label that draws a single line of text with <see cref="PixelFont"/>.
     ///
-    /// APTAL KUKLA — NodeView gibi: ne yazdigini BILMEZ, sadece yazar. Skorun ne oldugu,
-    /// altinin nereden geldigi HudPresenter'in isidir.
+    /// DUMB PUPPET — like NodeView: it does not KNOW what it writes, it only writes. What the score is
+    /// and where the gold comes from is HudPresenter's job.
     ///
-    /// Her karakter bir SpriteRenderer'dir ve bu nesneler HAVUZLANIR: metin degistiginde
-    /// yenileri uretilmez, var olanlarin sprite'i degisir, artanlar kapatilir. HUD her
-    /// hamlede guncellendigi icin bu onemli — aksi halde her zar atisi cop uretirdi.
+    /// Every character is a SpriteRenderer and these objects are POOLED: when the text changes no new ones
+    /// are created, the sprites of existing ones are swapped and the extras are disabled. This matters because
+    /// the HUD updates on every move — otherwise every dice roll would produce garbage.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class PixelLabel : MonoBehaviour
     {
-        [Header("İçerik")]
+        [Header("Content")]
         [SerializeField] private string _text = string.Empty;
         [SerializeField] private Color _color = Color.white;
         [SerializeField] private PixelTextAlign _align = PixelTextAlign.Center;
 
-        [Header("Ölçek ve sıralama")]
-        [Tooltip("Tuvalin piksel/birim oranı. Tahtayla aynı olmalı (BoardLayout).")]
+        [Header("Scale and sorting")]
+        [Tooltip("Pixels per unit of the canvas. Must match the board (BoardLayout).")]
         [SerializeField] private float _pixelsPerUnit = 12f;
-        [Tooltip("SortingGroup içindeyse grup içi sıra, değilse global sıra.")]
-        [SerializeField] private int _sortingOrder = 100;
+        [Tooltip("Order within the group when inside a SortingGroup, otherwise the global order.")]
+        [SerializeField] private int _sortingOrder = SortingOrders.HudTextInGroup;
 
         private readonly List<SpriteRenderer> _glyphs = new List<SpriteRenderer>();
 
         private int _sortingLayerId;
 
-        /// <summary>O an yazili olan metin.</summary>
+        /// <summary>The text currently displayed.</summary>
         public string Text => _text;
 
-        /// <summary>Metnin piksel cinsinden genisligi — slot'a sigip sigmadigini olcmek icin.</summary>
+        /// <summary>Width of the text in pixels — used to check whether it fits in a slot.</summary>
         public int MeasuredWidth => PixelFont.Measure(_text);
 
         private void Awake()
@@ -51,7 +51,7 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Gorsel ayarlari tek seferde kurar. HudView etiketi urettikten hemen sonra cagirir.
+        /// Applies all visual settings at once. HudView calls this right after creating the label.
         /// </summary>
         public void Configure(float pixelsPerUnit, int sortingLayerId, int sortingOrder,
                               Color color, PixelTextAlign align)
@@ -66,8 +66,8 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Yeni metin. Metin aynıysa TEK BIR renderer'a bile dokunulmaz — HUD saniyede
-        /// birkac kez tazelense de bu cagri bedava kalir.
+        /// New text. If the text is unchanged not a SINGLE renderer is touched — the call stays free
+        /// even if the HUD refreshes several times per second.
         /// </summary>
         public void SetText(string text)
         {
@@ -89,24 +89,25 @@ namespace Tavla.View
                 _glyphs[i].color = color;
         }
 
-        /// <summary>Etiketi gorunur/gizli yapar. Nesneler korunur, sadece cizim durur.</summary>
+        /// <summary>Shows/hides the label. Objects are kept, only drawing stops.</summary>
         public void SetVisible(bool visible)
         {
             gameObject.SetActive(visible);
         }
 
         /// <summary>
-        /// Metni gliflere dizer.
+        /// Lays the text out as glyphs.
         ///
-        /// Konumlar dogrudan piksel izgarasinin katlaridir (n / PPU): yarim piksele oturan
-        /// bir yazi tahtanin geri kalaniyla ayni netlikte gorunmez.
+        /// Positions are exact multiples of the pixel grid (n / PPU): text sitting on half pixels
+        /// would not look as sharp as the rest of the board.
         /// </summary>
         private void Rebuild()
         {
             float unit = 1f / (_pixelsPerUnit > 0f ? _pixelsPerUnit : 1f);
 
-            // Glif pivotu sol-ALT oldugu icin dikeyde ortalamak yariyi asagi kaydirmaktir.
-            float baseY = -(PixelFont.GlyphHeight * 0.5f) * unit;
+            // The glyph pivot is bottom-LEFT, so centring vertically means shifting down by half.
+            // Glyphs are 5 px — exactly half is half a pixel; Floor snaps to the grid (1 px lower).
+            float baseY = Mathf.Floor(-PixelFont.GlyphHeight * 0.5f) * unit;
             float startX = GetStartPixel() * unit;
 
             int used = 0;
@@ -115,37 +116,38 @@ namespace Tavla.View
             {
                 Sprite glyph = PixelFont.GetGlyph(_text[i], _pixelsPerUnit);
                 if (glyph == null)
-                    continue; // Bosluk: yer kaplar ama cizilmez.
+                    continue; // Space: takes room but is not drawn.
 
-                SpriteRenderer renderer = GetRenderer(used);
+                SpriteRenderer glyphRenderer = GetRenderer(used);
                 used++;
 
-                renderer.sprite = glyph;
-                renderer.color = _color;
-                renderer.sortingOrder = _sortingOrder;
+                glyphRenderer.sprite = glyph;
+                glyphRenderer.color = _color;
+                glyphRenderer.sortingOrder = _sortingOrder;
 
                 if (_sortingLayerId != 0)
-                    renderer.sortingLayerID = _sortingLayerId;
+                    glyphRenderer.sortingLayerID = _sortingLayerId;
 
-                renderer.enabled = true;
+                glyphRenderer.enabled = true;
 
-                // Adim, karakterin SIRASINA gore hesaplanir (bosluklar dahil) — sabit genislik.
-                renderer.transform.localPosition =
+                // The advance is computed from the character's INDEX (spaces included) — fixed width.
+                glyphRenderer.transform.localPosition =
                     new Vector3(startX + i * PixelFont.Advance * unit, baseY, 0f);
             }
 
-            // Kisalan metnin artiklari: yok edilmez, kapatilir. Sonraki uzun metin yeniden kullanir.
+            // Leftovers of a shorter text are disabled, not destroyed. The next longer text reuses them.
             for (int i = used; i < _glyphs.Count; i++)
                 _glyphs[i].enabled = false;
         }
 
-        /// <summary>Hizalamaya gore ilk glifin sol kenarinin piksel ofseti.</summary>
+        /// <summary>Pixel offset of the first glyph's left edge according to the alignment.</summary>
         private float GetStartPixel()
         {
             int width = PixelFont.Measure(_text);
 
+            // The width is always odd (4n-1); avoid ending up on a half pixel.
             if (_align == PixelTextAlign.Center)
-                return -width * 0.5f;
+                return Mathf.Floor(-width * 0.5f);
 
             if (_align == PixelTextAlign.Right)
                 return -width;

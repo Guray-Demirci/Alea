@@ -3,8 +3,8 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Abilities
 {
     /// <summary>
-    /// Kirilan pulun bara gitme kuralini ezer.
-    /// Anka Pulu -> HomeEntry (baslangic hanesine doner), Fedakar Pul -> Destroyed (yok olur).
+    /// Overrides the rule that a captured checker goes to the bar.
+    /// Phoenix Checker -> HomeEntry (returns to its starting point), Sacrificial Checker -> Destroyed.
     /// </summary>
     public interface ICustomCaptureDestination : ICheckerAbility
     {

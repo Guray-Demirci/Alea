@@ -6,16 +6,16 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Bar Pulu (The Bouncer). "%50 ihtimalle onundeki ilk rakip pulunu direkt kirar,
-    /// %25 ihtimalle kendi kendini kirar."
-    /// Tek bir zar atisi (0-99) ile uc sonucu da ayiriyoruz: 0-49 kirar, 50-74 kendini kirar, 75-99 hicbir sey.
+    /// Bouncer Checker. "50% chance to hit the first enemy checker ahead of it directly,
+    /// 25% chance to hit itself."
+    /// A single roll (0-99) separates all three outcomes: 0-49 hits, 50-74 self-hit, 75-99 nothing.
     /// </summary>
     public class BouncerChecker : BaseChecker, IMoveReactor, IPermanent
     {
         public const string Id = "checker_bouncer";
 
-        private const int CaptureThreshold = 50;   // %50
-        private const int SelfHitThreshold = 75;   // sonraki %25
+        private const int CaptureThreshold = 50;   // 50%
+        private const int SelfHitThreshold = 75;   // the next 25%
 
         public override string TypeId => Id;
 
@@ -32,13 +32,13 @@ namespace Tavla.Core.Checkers
             }
             else if (roll < SelfHitThreshold)
             {
-                // Kendi kendini kirar. ForceCapture'dan gectigi icin Anka/Fedakar kurallari da isler.
-                context.Board.ReportAbility("BouncerSelfHit", this, result.ToIndex);
+                // Hits itself. It goes through ForceCapture, so the Phoenix/Sacrificial rules also apply.
+                context.Board.ReportAbility(AbilityIds.BouncerSelfHit, this, result.ToIndex);
                 context.Board.ForceCapture(this, result.ToIndex, OwnerId);
             }
         }
 
-        /// <summary>Ilerleme yonunde ilk rakip pulunu bulup kirar.</summary>
+        /// <summary>Finds and captures the first enemy checker in the direction of travel.</summary>
         private void CaptureFirstEnemyAhead(IMatchContext context, int fromIndex)
         {
             int step = GameState.GetDirection(OwnerId);
@@ -51,21 +51,21 @@ namespace Tavla.Core.Checkers
                 if (enemy == null)
                     continue;
 
-                // Zirhli Pul gibi bagisikligi olanlar bu yetenekten de etkilenmez.
+                // Checkers with immunity (e.g. Armored) are not affected by this ability either.
                 if (!enemy.CanBeCaptured)
                     return;
 
-                context.Board.ReportAbility("BouncerStrike", this, index);
+                context.Board.ReportAbility(AbilityIds.BouncerStrike, this, index);
                 context.Board.ForceCapture(enemy, index, OwnerId);
                 return;
             }
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Bar Pulu";
+        public string DisplayName => "Bouncer Checker";
         public int Price => 600;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public BouncerChecker(int ownerId) : base(ownerId) { }

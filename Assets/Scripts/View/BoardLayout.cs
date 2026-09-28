@@ -3,70 +3,86 @@ using UnityEngine;
 namespace Tavla.View
 {
     /// <summary>
-    /// Tahtanin GORSEL geometrisi. Degerler dogrudan play_game_scheme.aseprite dosyasindan
-    /// piksel piksel olculdu. Burada oyun kurali yoktur — sadece "hane 7 ekranda nerede?"
-    /// sorusunun cevabi vardir.
+    /// VISUAL geometry of the board. Values were measured pixel by pixel from play_game_scheme.aseprite.
+    /// There are no game rules here — only the answer to "where is point 7 on screen?".
     ///
-    /// Neden ScriptableObject? Cunku sanatci ucgen araligini degistirdiginde kod derlenmesin,
-    /// sadece asset guncellensin. BoardManager'a atanmazsa varsayilan degerlerle calisir.
+    /// Why a ScriptableObject? So that when the artist changes the triangle spacing nothing has to be
+    /// recompiled; only the asset is updated. If none is assigned, the owner falls back to the defaults
+    /// via <see cref="CreateDefault"/>.
     /// </summary>
     [CreateAssetMenu(fileName = "BoardLayout", menuName = "Tavla/Board Layout")]
     public class BoardLayout : ScriptableObject
     {
-        [Header("Tuval (aseprite şeması)")]
+        [Header("Canvas (Aseprite scheme)")]
         [SerializeField] private int _canvasWidth = 320;
         [SerializeField] private int _canvasHeight = 180;
         [SerializeField] private float _pixelsPerUnit = 12f;
 
-        [Header("Üçgen yerleşimi (piksel)")]
-        [Tooltip("İlk üçgenin sol kenarı")]
+        [Header("Triangle layout (pixels)")]
+        [Tooltip("Left edge of the first triangle.")]
         [SerializeField] private int _firstTriangleX = 90;
-        [Tooltip("İki üçgen arası mesafe (12 genişlik + 2 boşluk)")]
+        [Tooltip("Distance between two triangles (12 width + 2 gap).")]
         [SerializeField] private int _trianglePitch = 14;
         [SerializeField] private int _triangleWidth = 12;
-        [Tooltip("6. üçgenden itibaren eklenen bar kayması")]
+        [Tooltip("Bar offset added from the 6th triangle on.")]
         [SerializeField] private int _barOffset = 14;
         [SerializeField] private int _triangleHeight = 56;
 
-        [Tooltip("Üst sıra üçgenlerinin üst kenarı")]
+        [Tooltip("Top edge of the top-row triangles.")]
         [SerializeField] private int _topRowTopY = 18;
-        [Tooltip("Alt sıra üçgenlerinin alt kenarı (161 dahil olduğu için 162)")]
+        [Tooltip("Bottom edge of the bottom-row triangles (162 because 161 is inclusive).")]
         [SerializeField] private int _bottomRowBottomY = 162;
 
-        [Header("Pul dizilimi")]
+        [Header("Checker stacking")]
         [SerializeField] private int _checkerSize = 12;
-        [Tooltip("Üst üste dizilen pullar arası mesafe. 11 px -> 5 pul 55 px, 56 px üçgene sığar.")]
+        [Tooltip("Spacing between stacked checkers. 11 px -> 5 checkers take 55 px and fit a 56 px triangle.")]
         [SerializeField] private int _stackStep = 11;
 
-        [Tooltip("Pulların z ekseninde hanelerin ÖNÜNDE durması için. Aksi halde fare tıklaması " +
-                 "hane collider'ına takılır ve sürükleme başlamaz.")]
+        [Tooltip("Keeps checkers IN FRONT of the points on the z axis. Otherwise mouse clicks hit the " +
+                 "point collider and dragging never starts.")]
         [SerializeField] private float _checkerZ = -1f;
 
-        [Header("Bar (kırık pullar)")]
+        [Header("Bar (hit checkers)")]
         [SerializeField] private int _barCenterX = 180;
         [SerializeField] private int _barCenterY = 90;
         [SerializeField] private int _barStackStep = 4;
-        [Tooltip("Bar boşluğunun oyuncu başına düşen yüksekliği (32 px'lik boşluğun yarısı).")]
+        [Tooltip("Height of the bar gap per player (half of the 32 px gap).")]
         [SerializeField] private int _barHalfHeight = 16;
 
-        [Header("Toplama alanı (bear-off)")]
-        [Tooltip("Tahtanın sağındaki boş şeridin yatay merkezi. Çerçeve 279 px'te bitiyor, " +
-                 "sol taraf ise bilgi paneline ait.")]
+        [Header("Bear-off area")]
+        [Tooltip("Horizontal centre of the empty strip right of the board. The frame ends at 279 px; " +
+                 "the left side belongs to the info panel.")]
         [SerializeField] private int _bearOffCenterX = 298;
         [SerializeField] private int _bearOffWidth = 28;
 
+        /// <summary>Number of columns per row (6 points on each side of the bar).</summary>
+        private const int ColumnsPerRow = 12;
+        private const int ColumnsPerQuadrant = 6;
+
+        /// <summary>
+        /// Creates an in-memory layout with the default values. The caller owns the instance and
+        /// must destroy it when done (it is never saved to disk).
+        /// </summary>
+        public static BoardLayout CreateDefault()
+        {
+            BoardLayout layout = CreateInstance<BoardLayout>();
+            layout.name = "BoardLayout (Default)";
+            layout.hideFlags = HideFlags.DontSave;
+            return layout;
+        }
+
         public float PixelsPerUnit => _pixelsPerUnit;
 
-        /// <summary>Ortografik kamera boyutu — tam piksel orani icin.</summary>
+        /// <summary>Orthographic camera size for a pixel-exact ratio.</summary>
         public float CameraOrthographicSize => (_canvasHeight * 0.5f) / _pixelsPerUnit;
 
-        /// <summary>Pulun dunya birimi cinsinden boyutu (collider icin).</summary>
+        /// <summary>Checker size in world units (for the collider).</summary>
         public float CheckerWorldSize => _checkerSize / _pixelsPerUnit;
 
         /// <summary>
-        /// Aseprite piksel koordinatini Unity dunya koordinatina cevirir.
-        /// Aseprite'ta y ASAGI artar, Unity'de YUKARI — cevrim burada tek yerde yapilir.
-        /// Tahtanin merkezi dunya orijinindedir (0,0).
+        /// Converts an Aseprite pixel coordinate into a Unity world coordinate.
+        /// In Aseprite y grows DOWNWARD, in Unity UPWARD — the conversion happens here, in one place.
+        /// The centre of the board is the world origin (0,0).
         /// </summary>
         public Vector3 PixelToWorld(float px, float py)
         {
@@ -76,24 +92,25 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// HANE INDEKSI -> EKRAN ESLEMESI (mimarinin sozlesmesi):
-        ///   0..11  -> ust sira, SOLDAN SAGA
-        ///   12..23 -> alt sira, SAGDAN SOLA
-        /// Boylece Oyuncu 0 (0 -> 23) sol ustten baslayip U cizerek sol alta iner.
+        /// POINT INDEX -> SCREEN MAPPING (the contract of the architecture):
+        ///   0..11  -> top row, LEFT TO RIGHT
+        ///   12..23 -> bottom row, RIGHT TO LEFT
+        /// So player 0 (0 -> 23) starts top-left and draws a U down to the bottom-left.
         /// </summary>
-        public bool IsTopRow(int nodeIndex) => nodeIndex < 12;
+        public bool IsTopRow(int nodeIndex) => nodeIndex < ColumnsPerRow;
 
-        /// <summary>Hane indeksinden ekrandaki sutun numarasini (0-11, soldan saga) verir.</summary>
-        public int GetColumn(int nodeIndex) => nodeIndex < 12 ? nodeIndex : 23 - nodeIndex;
+        /// <summary>Screen column (0-11, left to right) of a point index.</summary>
+        public int GetColumn(int nodeIndex) =>
+            nodeIndex < ColumnsPerRow ? nodeIndex : (2 * ColumnsPerRow - 1) - nodeIndex;
 
-        /// <summary>Sutunun piksel cinsinden yatay merkezi. Bar boslugu formule gomulu.</summary>
+        /// <summary>Horizontal centre of a column in pixels. The bar gap is built into the formula.</summary>
         private float GetColumnCenterX(int column)
         {
-            int left = _firstTriangleX + column * _trianglePitch + (column >= 6 ? _barOffset : 0);
+            int left = _firstTriangleX + column * _trianglePitch + (column >= ColumnsPerQuadrant ? _barOffset : 0);
             return left + _triangleWidth * 0.5f;
         }
 
-        /// <summary>Ucgenin merkezi — NodeView'in konumu ve collider'i icin.</summary>
+        /// <summary>Centre of the triangle — position and collider of the NodeView.</summary>
         public Vector3 GetNodeCenter(int nodeIndex)
         {
             float px = GetColumnCenterX(GetColumn(nodeIndex));
@@ -105,23 +122,23 @@ namespace Tavla.View
             return PixelToWorld(px, py);
         }
 
-        /// <summary>NodeView collider'inin dunya birimi cinsinden boyutu.</summary>
+        /// <summary>Size of the NodeView collider in world units.</summary>
         public Vector2 GetNodeSize()
         {
             return new Vector2(_triangleWidth / _pixelsPerUnit, _triangleHeight / _pixelsPerUnit);
         }
 
         /// <summary>
-        /// Toplama birakma alaninin merkezi. Tahtanin DISINDA durur: ucgenlerin ustune
-        /// konsaydi collider'i pul tiklamalarini calardi. Dikeyde iki ucgen sirasini kapsar —
-        /// tek alan iki oyuncuya da yeter, kimin topladigini Core sirasi gelen oyuncudan biliyor.
+        /// Centre of the bear-off drop area. It sits OUTSIDE the board: on top of the triangles its
+        /// collider would steal checker clicks. Vertically it spans both triangle rows — one area is
+        /// enough for both players, Core knows who is bearing off from the current player.
         /// </summary>
         public Vector3 GetBearOffCenter()
         {
             return PixelToWorld(_bearOffCenterX, (_topRowTopY + _bottomRowBottomY) * 0.5f);
         }
 
-        /// <summary>Toplama alani collider'inin dunya birimi cinsinden boyutu.</summary>
+        /// <summary>Size of the bear-off collider in world units.</summary>
         public Vector2 GetBearOffSize()
         {
             return new Vector2(_bearOffWidth / _pixelsPerUnit,
@@ -129,33 +146,32 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Yigin araligini mevcut alana sigdirir.
+        /// Fits the stack spacing into the available space.
         ///
-        /// Core artik bir haneye 15 pulun tamaminin yigilmasina izin veriyor. Sabit 11 px
-        /// aralikla 15 pul 154 px eder — 56 px'lik ucgeni fena halde tasar. Bu hesap,
-        /// yigin buyudukce pullari ust uste bindirerek her zaman alanin icinde tutar.
-        /// Az sayida pulda tercih edilen aralik aynen korunur.
+        /// Core allows all 15 checkers on a single point. With a fixed 11 px step, 15 checkers take
+        /// 154 px — far beyond a 56 px triangle. This calculation overlaps checkers as the stack grows
+        /// so it always stays inside the area. For small stacks the preferred step is kept as is.
         /// </summary>
         private static float FitStep(float preferredStep, float usableHeight, int stackCount)
         {
             if (stackCount <= 1 || usableHeight <= 0f)
                 return preferredStep;
 
-            // stackCount-1 aralik var (ilk pulun kendisi yer kaplamiyor sayilir).
+            // There are stackCount-1 gaps (the first checker itself is not counted).
             float fitted = usableHeight / (stackCount - 1);
             return fitted < preferredStep ? fitted : preferredStep;
         }
 
         /// <summary>
-        /// Bir hanedeki k'inci pulun konumu.
-        /// Ust sirada pullar asagi dogru, alt sirada yukari dogru dizilir — ucgenin tabanindan iceri.
+        /// Position of the k-th checker on a point.
+        /// On the top row checkers stack downward, on the bottom row upward — inward from the triangle's base.
         /// </summary>
-        /// <param name="stackCount">Hanedeki toplam pul sayisi; aralik buna gore daralir.</param>
+        /// <param name="stackCount">Total checkers on the point; the spacing shrinks accordingly.</param>
         public Vector3 GetCheckerPosition(int nodeIndex, int stackIndex, int stackCount)
         {
             float px = GetColumnCenterX(GetColumn(nodeIndex));
 
-            // Son pulun MERKEZI ucgenin icinde kalsin diye pul boyu kadari dusuluyor.
+            // The checker size is subtracted so the CENTRE of the last checker stays inside the triangle.
             float step = FitStep(_stackStep, _triangleHeight - _checkerSize, stackCount);
 
             float py = IsTopRow(nodeIndex)
@@ -167,8 +183,8 @@ namespace Tavla.View
             return world;
         }
 
-        /// <summary>Bardaki k'inci pulun konumu. Oyuncu 0 merkezden yukari, oyuncu 1 asagi dizilir.</summary>
-        /// <param name="stackCount">Bardaki toplam pul sayisi; aralik buna gore daralir.</param>
+        /// <summary>Position of the k-th checker on the bar. Player 0 stacks up from the centre, player 1 down.</summary>
+        /// <param name="stackCount">Total checkers on the bar; the spacing shrinks accordingly.</param>
         public Vector3 GetBarPosition(int playerId, int stackIndex, int stackCount)
         {
             float direction = playerId == 0 ? -1f : 1f;

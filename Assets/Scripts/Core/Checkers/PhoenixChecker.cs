@@ -5,16 +5,16 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Anka Pulu (The Phoenix). Iki katmanli bir puldur:
-    ///   Tahta kurali : Kirildiginda BARA gitmez, kendi baslangic hanesine doner (esir dusmez).
-    ///   Meta kurali  : Her kirilisinda "Kullerinden Dogus" tetiklenir -> sonraki dukkanda
-    ///                  sadece Rare/Epic/Efsanevi urunler cikar ve %50 indirime girer.
+    /// Phoenix Checker. A two-layer checker:
+    ///   Board rule : when captured it does NOT go to the bar, it returns to its own starting point.
+    ///   Meta rule  : every capture triggers "Rise from the Ashes" -> the next shop offers only
+    ///                Rare/Epic/Legendary items at a 50% discount.
     /// </summary>
     public class PhoenixChecker : BaseChecker, ICustomCaptureDestination, ICaptureReactor, IPermanent
     {
         public const string Id = "checker_phoenix";
 
-        /// <summary>Kac kez kullerinden dogdugu — View'in tuy/alev efektini buyutmesi icin.</summary>
+        /// <summary>How many times it has risen from the ashes — lets the View grow its feather/flame effect.</summary>
         public int RebirthCount { get; private set; }
 
         public override string TypeId => Id;
@@ -25,14 +25,14 @@ namespace Tavla.Core.Checkers
         {
             RebirthCount++;
             context.TriggerLuxuryShop(OwnerId);
-            context.Board.ReportAbility("PhoenixRebirth", this, nodeIndex);
+            context.Board.ReportAbility(AbilityIds.PhoenixRebirth, this, nodeIndex);
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Anka Pulu";
+        public string DisplayName => "Phoenix Checker";
         public int Price => 900;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public PhoenixChecker(int ownerId) : base(ownerId) { }

@@ -1,40 +1,42 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Tavla.View
 {
     /// <summary>
-    /// Tahtadaki tek bir hanenin (ucgenin) birakma hedefi.
-    /// TEK sorumlulugu: "ben kacinci haneyim?" sorusuna cevap vermek.
+    /// Drop target of a single point (triangle) on the board.
+    /// ONE responsibility: answering "which point am I?".
     ///
-    /// Bilerek aptal tutuldu — bu haneye pul konabilir mi, dolu mu, rakibin kapisi mi,
-    /// hicbirini BILMEZ ve sormaz. O sorularin cevabi sadece GameState'te vardir.
+    /// Deliberately kept dumb — whether a checker may be placed here, whether it is full or held by the
+    /// opponent, it KNOWS none of it and asks nothing. Those answers exist only in GameState.
     /// </summary>
     [RequireComponent(typeof(BoxCollider2D))]
     public class NodeView : MonoBehaviour
     {
         [SerializeField] private int _nodeIndex;
 
-        [Header("Görsel geri bildirim (opsiyonel)")]
+        [Header("Visual feedback (optional)")]
         [SerializeField] private SpriteRenderer _highlight;
-        [SerializeField] private Color _hoverColor = new Color(1f, 1f, 1f, 0.25f);
+        [FormerlySerializedAs("_hoverColor")]
+        [SerializeField] private Color _highlightColor = new Color(1f, 1f, 1f, 0.25f);
 
         private BoxCollider2D _collider;
 
-        /// <summary>Core tarafindaki GameState.Nodes dizisindeki indeks (0-23).</summary>
+        /// <summary>Index in Core's GameState.Nodes array (0-23), or GameState.BearOffIndex for the tray.</summary>
         public int NodeIndex => _nodeIndex;
 
         private void Awake()
         {
             _collider = GetComponent<BoxCollider2D>();
 
-            // Collider tetikleyici olmali: pullar hanelere fiziksel olarak carpmasin,
-            // sadece OverlapPoint ile "uzerine birakildi mi" tespiti yapilsin.
+            // The collider must be a trigger: checkers must not physically collide with points,
+            // only the overlap query "was it dropped here?" is needed.
             _collider.isTrigger = true;
 
             SetHighlight(false);
         }
 
-        /// <summary>BoardManager sahneyi kurarken cagirir.</summary>
+        /// <summary>Called by BoardManager while building the scene.</summary>
         public void Initialize(int nodeIndex, Vector3 worldPosition, Vector2 size, Sprite highlightSprite = null)
         {
             _nodeIndex = nodeIndex;
@@ -56,8 +58,8 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Vurgu gorselini koddan kurar. Sprite 1 dunya birimi boyutunda oldugu icin
-        /// olcegi dogrudan hane boyutuna esitliyoruz.
+        /// Builds the highlight visual in code. The sprite is 1 world unit in size,
+        /// so its scale is set directly to the point size.
         /// </summary>
         private void BuildHighlight(Sprite sprite, Vector2 size)
         {
@@ -68,21 +70,21 @@ namespace Tavla.View
 
             _highlight = go.AddComponent<SpriteRenderer>();
             _highlight.sprite = sprite;
-            _highlight.color = _hoverColor;
-            _highlight.sortingOrder = 0; // Zeminin (-100) ustunde, pullarin (10+) altinda.
+            _highlight.color = _highlightColor;
+            _highlight.sortingOrder = SortingOrders.NodeHighlight;
         }
 
-        /// <summary>Surukleme sirasinda pulun uzerinde durdugu haneyi vurgular. Sadece gorsel.</summary>
+        /// <summary>Highlights this point as a legal destination while dragging. Visual only.</summary>
         public void SetHighlight(bool active)
         {
             if (_highlight == null)
                 return;
 
             _highlight.enabled = active;
-            _highlight.color = _hoverColor;
+            _highlight.color = _highlightColor;
         }
 
-        // Editorde hane sinirlarini ve indeksini gorebilmek icin.
+        // Shows the point bounds in the editor.
         private void OnDrawGizmosSelected()
         {
             BoxCollider2D box = GetComponent<BoxCollider2D>();

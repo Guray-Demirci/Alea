@@ -4,10 +4,11 @@ using Tavla.Core.Interfaces;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Zirhli Pul. "Asla kirilamaz. Tek basina dursa bile kapi sayilir."
-    /// IKI ayri yetenek uyguluyor cunku bunlar iki farkli kuraldir:
-    /// kirilmazlik (ICaptureImmunity) ile tek basina kapi olmak (IBlockadeOverride) bagimsizdir.
-    /// Sisli Hane'ye girerse GetAbility null doner ve ikisi de kendiliginden duser.
+    /// Armored Checker. "Can never be captured. Counts as a made point even when alone."
+    /// Implements TWO separate abilities because these are two different rules:
+    /// being uncapturable (<see cref="ICaptureImmunity"/>) and forming a point alone
+    /// (<see cref="IBlockadeOverride"/>) are independent.
+    /// Inside a Fog Tile GetAbility returns null and both drop automatically.
     /// </summary>
     public class ArmoredChecker : BaseChecker, ICaptureImmunity, IBlockadeOverride, IPermanent
     {
@@ -16,18 +17,18 @@ namespace Tavla.Core.Checkers
         public override string TypeId => Id;
 
         // --- ICaptureImmunity ---
-        public bool IsImmune => true;                 // Kalici zirh, hak tukenmez.
-        public void OnImmunityTriggered() { }         // Harcanacak bir sey yok.
+        public bool IsImmune => true;                 // Permanent armor, never runs out.
+        public void OnImmunityTriggered() { }         // Nothing to spend.
 
         // --- IBlockadeOverride ---
         public bool FormsBlockadeAlone => true;
 
         // --- IPurchasable ---
         public string ItemId => Id;
-        public string DisplayName => "Zırhlı Pul";
+        public string DisplayName => "Armored Checker";
         public int Price => 500;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public ArmoredChecker(int ownerId) : base(ownerId) { }

@@ -3,12 +3,12 @@ using Tavla.Core.Board;
 namespace Tavla.Core.Runtime
 {
     /// <summary>
-    /// Yeteneklerin (ability) oyuna dokunabildigi TEK kapi.
-    /// Dokumandaki pullar skor, altin, zar ve sira gibi cok farkli sistemlere dokunuyor.
-    /// Her yetenege ayri ayri servis enjekte etmek yerine tek bir sozlesme veriyoruz:
-    ///  - Yetenek imzalari tek tip kalir (OnMoveCompleted(IMatchContext, ...)),
-    ///  - Testte sahte (fake) bir MatchContext yazmak yeterlidir,
-    ///  - Yeni bir sistem geldiginde sadece buraya metot eklenir, 30 sinif degismez.
+    /// The SINGLE gateway through which abilities can touch the game.
+    /// The designed checkers touch very different systems: score, gold, dice and turn order.
+    /// Instead of injecting a separate service into every ability we provide one contract:
+    ///  - ability signatures stay uniform (OnMoveCompleted(IMatchContext, ...)),
+    ///  - writing a fake MatchContext is enough for tests,
+    ///  - when a new system arrives only this interface gains a method; 30 classes stay untouched.
     /// </summary>
     public interface IMatchContext
     {
@@ -16,34 +16,34 @@ namespace Tavla.Core.Runtime
         IRandomProvider Random { get; }
         DiceRoll CurrentRoll { get; }
 
-        // --- Skor ---
-        /// <summary>Kasif Pulu gibi duz puan uretenler.</summary>
-        /// <returns>Carpanlar uygulandiktan SONRA gercekten yazilan puan.</returns>
+        // --- Score ---
+        /// <summary>For checkers that produce flat points, such as the Navigator.</summary>
+        /// <returns>The score actually written AFTER multipliers are applied.</returns>
         int AddScore(int playerId, int amount);
 
-        /// <summary>Oyuncunun toplam skoru. GameState mac sonunda kazanani bununla belirler.</summary>
+        /// <summary>The player's total score. GameState uses it to decide the winner at the end of the match.</summary>
         int GetScore(int playerId);
 
-        /// <summary>Katalizor (o el x2) ve Kusatma (kalici x2) carpan biriktirir.</summary>
+        /// <summary>Accumulates multipliers: Catalyst (x2 this turn) and Siege (permanent x2).</summary>
         void AddScoreMultiplier(int playerId, float multiplier, bool permanent);
 
-        /// <summary>Korsan Koyu: o turda uretilen tum skoru sifirlar.</summary>
+        /// <summary>Plunder Cove: resets all score produced during this turn.</summary>
         void ResetTurnScore(int playerId);
 
-        // --- Ekonomi ---
+        // --- Economy ---
         void AddGold(int playerId, int amount);
 
-        /// <summary>Fedakar Pul: dukkandaki tum esyalari kalici olarak ucuzlatir.</summary>
+        /// <summary>Sacrificial Checker: permanently discounts every item in the shop.</summary>
         void AddShopDiscount(int amount);
 
-        /// <summary>Anka Pulu: sonraki dukkan asamasinda sadece nadir+ urunler, %50 indirimli.</summary>
+        /// <summary>Phoenix Checker: the next shop offers only rare+ items at 50% off.</summary>
         void TriggerLuxuryShop(int playerId);
 
-        // --- Tur / Zar ---
-        /// <summary>Zaman Buken Pul: hedef oyuncunun sirasini atlatir.</summary>
+        // --- Turn / dice ---
+        /// <summary>Time Bender Checker: makes the target player skip their turn.</summary>
         void SkipTurn(int playerId);
 
-        /// <summary>Sabitleyici Pul & Meridyen Kaymasi: bir sonraki atista bir zari sabitler.</summary>
+        /// <summary>Anchor Checker &amp; Meridian Shift: pins one die of the next roll.</summary>
         void PinNextDie(int playerId, int value);
     }
 }

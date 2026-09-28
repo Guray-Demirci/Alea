@@ -5,51 +5,51 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Interfaces
 {
     /// <summary>
-    /// Bir hanenin (Node) uzerine kurulan ozel karo / tuzak sozlesmesi.
-    /// GameState somut karo siniflarini TANIMAZ, sadece bu arayuz uzerinden konusur (DIP).
+    /// Contract for a special tile / trap installed on a point (<see cref="Node"/>).
+    /// GameState does NOT know concrete tile classes; it talks to them only through this interface (DIP).
     ///
-    /// Hook seti dokumandaki 8 karonun ihtiyacina gore belirlendi:
-    ///   CanLandOn            -> Zindan (kapaliyken giris yok)
-    ///   CanLeaveFrom         -> Bataklik (saplanan pul cikamaz), Zindan (kilitli tur)
-    ///   BlocksBlockade       -> Zindan (kapaliyken kapi alinamaz)
-    ///   OnCheckerLanded      -> Kazik, Girdap, Bataklik, Sis, Haydut Kampi, Barut Ficisi
-    ///   OnCheckerLeft        -> Sis (yetenekleri geri ver), Barut Ficisi (sayaci durdur)
-    ///   OnCheckerPassedOver  -> Haydut Kampi ("gecen veya oturan her pul")
-    ///   OnTurnPassed         -> Zindan (ac-kapa), Barut Ficisi (geri sayim), Korsan Koyu
+    /// The hook set was derived from the needs of the 8 designed tiles:
+    ///   CanLandOn            -> Dungeon (no entry while closed)
+    ///   CanLeaveFrom         -> Swamp (stuck checkers cannot leave), Dungeon (locked turn)
+    ///   AllowsBlockade       -> Dungeon (no point can be made while closed)
+    ///   OnCheckerLanded      -> Spike Pit, Maelstrom, Swamp, Fog, Toll Booth, Powder Keg
+    ///   OnCheckerLeft        -> Fog (restore abilities), Powder Keg (stop the fuse)
+    ///   OnCheckerPassedOver  -> Toll Booth ("every checker that passes or sits here")
+    ///   OnTurnPassed         -> Dungeon (open/close), Powder Keg (countdown), Plunder Cove
     /// </summary>
     public interface ITileEffect
     {
-        /// <summary>Karo tipinin kimligi. View buna bakip dogru gorseli/VFX'i basar.</summary>
+        /// <summary>Tile type identifier. The View uses it to pick the right visuals/VFX.</summary>
         string EffectId { get; }
 
-        /// <summary>Karoyu kuran oyuncu; harita karosuysa -1 (tarafsiz).</summary>
+        /// <summary>Player who placed the tile; -1 for neutral map tiles.</summary>
         int OwnerId { get; }
 
-        /// <summary>Kac tur daha aktif kalacak. Kalici karolar icin -1.</summary>
+        /// <summary>How many more turns the tile stays active. -1 for permanent tiles.</summary>
         int RemainingTurns { get; }
 
-        /// <summary>Suresi doldu mu? Dolduysa GameState karoyu haneden temizler.</summary>
+        /// <summary>Has the tile expired? If so, GameState removes it from the point.</summary>
         bool IsExpired { get; }
 
-        /// <summary>Bu pul bu haneye konabilir mi? DOGRULAMA asamasinda cagrilir — yan etkisi olmamali.</summary>
+        /// <summary>Can this checker land on this point? Called during VALIDATION — must have no side effects.</summary>
         bool CanLandOn(BaseChecker checker);
 
-        /// <summary>Bu pul bu haneden cikabilir mi? (Bataklik kilidi, Zindan parmakliklari.)</summary>
+        /// <summary>Can this checker leave this point? (Swamp lock, Dungeon bars.)</summary>
         bool CanLeaveFrom(BaseChecker checker);
 
-        /// <summary>Bu hanede kapi (blokaj) kurulabilir mi? Zindan kapaliyken false doner.</summary>
+        /// <summary>Can a point (blockade) be made here? Returns false while the Dungeon is closed.</summary>
         bool AllowsBlockade { get; }
 
-        /// <summary>Pul haneye yerlestikten SONRA. Karonun asil etkisi burada uygulanir.</summary>
+        /// <summary>AFTER a checker has settled on the point. The tile's main effect is applied here.</summary>
         void OnCheckerLanded(IMatchContext context, Node node, BaseChecker checker);
 
-        /// <summary>Pul haneden ayrildiktan SONRA. Gecici etkilerin geri alindigi yer.</summary>
+        /// <summary>AFTER a checker has left the point. Temporary effects are reverted here.</summary>
         void OnCheckerLeft(IMatchContext context, Node node, BaseChecker checker);
 
-        /// <summary>Pul bu hanenin UZERINDEN gectiginde (durmadan). Haydut Kampi bunu kullanir.</summary>
+        /// <summary>When a checker passes OVER this point without stopping. Used by the Toll Booth.</summary>
         void OnCheckerPassedOver(IMatchContext context, Node node, BaseChecker checker);
 
-        /// <summary>Her tur sonunda cagrilir. Sayac azaltma / ac-kapa dongusu burada isler.</summary>
+        /// <summary>Called at the end of every turn. Countdowns and open/close cycles run here.</summary>
         void OnTurnPassed(IMatchContext context, Node node);
     }
 }

@@ -7,43 +7,52 @@ using Tavla.Core.Runtime;
 namespace Tavla.View
 {
     /// <summary>
-    /// CORE -> HUD koprusu. Panelde NE yazacagini bilen tek yer burasi.
+    /// CORE -> HUD bridge. The only place that knows WHAT to write on the panel.
     ///
-    /// Is bolumu:
-    ///   Core         : HUD'un varligindan HABERSIZDIR, sadece event firlatir.
-    ///   HudPresenter : o event'leri dinler ve metne cevirir (bu dosya).
-    ///   HudView      : metni nereye, hangi renkte, hangi sirada basacagini bilir.
+    /// Division of labour:
+    ///   Core         : UNAWARE of the HUD, it only raises events.
+    ///   HudPresenter : listens to those events and turns them into text (this file).
+    ///   HudView      : knows where, in which colour and in which order to draw the text.
     ///
-    /// Boylece panel semasi degisince Core'a, oyun kurali degisince panele dokunulmaz.
-    /// BoardManager'la ayni sozlesme: burada oyun kurali YOKTUR, tek satir hesap yapilmaz;
-    /// gosterilen her sayi Core'dan oldugu gibi okunur.
+    /// So a change to the panel layout never touches Core, and a rule change never touches the panel.
+    /// Same contract as BoardManager: there are NO game rules here, not a single line of calculation;
+    /// every number shown is read from Core as is.
     ///
-    /// Baglanti iki fazlidir (MatchContext <-> GameState ile ayni desen): BoardManager,
-    /// Core'u ayaga kaldirdiktan sonra Bind cagirir. Sahnede bu bilesen olmasa da oyun calisir.
+    /// The connection has two phases (the same pattern as MatchContext <-> GameState): BoardManager
+    /// calls Bind after Core is up. The game still runs if this component is not in the scene.
+    ///
+    /// All player-facing strings are serialized fields so they can be changed (or later fed from a
+    /// localization table) without touching code. Keep them within the PixelFont character set
+    /// (A-Z, 0-9 and basic punctuation).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HudPresenter : MonoBehaviour
     {
-        [Header("Bağlantı")]
-        [Tooltip("Boş bırakılırsa aynı objede, sonra sahnede aranır.")]
+        [Header("Connection")]
+        [Tooltip("If empty, it is looked up on the same object, then in the scene.")]
         [SerializeField] private HudView _view;
 
-        [Header("Kim gösteriliyor")]
-        [Tooltip("Panelin skorunu ve altınını gösterdiği oyuncu. Tek panel var: bot 1 ise burası 0 kalmalı.")]
+        [Header("Displayed player")]
+        [Tooltip("Player whose score and gold the panel shows. There is one panel: if the bot is player 1, keep this at 0.")]
         [SerializeField] private int _playerId = 0;
 
-        [Header("Biçim")]
-        [Tooltip("Kalan zarların arasına konan ayraç.")]
+        [Header("Formatting")]
+        [Tooltip("Separator placed between the remaining dice.")]
         [SerializeField] private string _diceSeparator = " ";
-        [Tooltip("Gösterilecek değer yokken yazılan metin (zar atılmadan önce, hamle bitince).")]
+        [Tooltip("Text shown when there is no value (before the dice are rolled, after all moves are spent).")]
         [SerializeField] private string _emptyValue = "-";
-        [Tooltip("Görev satırındaki kalan tur başlığı. Kalan sayı arkasına eklenir.")]
-        [SerializeField] private string _turnPrefix = "TUR ";
+        [Tooltip("Prefix of the remaining-turns text on the task line. The number is appended.")]
+        [SerializeField] private string _turnsRemainingPrefix = "TURN ";
+
+        [Header("Match result")]
+        [SerializeField] private string _winText = "YOU WIN";
+        [SerializeField] private string _loseText = "YOU LOSE";
+        [SerializeField] private string _drawText = "DRAW";
 
         private GameState _board;
         private MatchContext _context;
 
-        // Zar listesi her hamlede yeniden kurulur; her seferinde string birlestirmemek icin.
+        // The dice list is rebuilt on every move; avoids string concatenation each time.
         private readonly StringBuilder _builder = new StringBuilder(16);
 
         private void Awake()
@@ -55,63 +64,62 @@ namespace Tavla.View
                 _view = FindAnyObjectByType<HudView>();
 
             if (_view == null)
-                Debug.LogError("[View] HudPresenter bir HudView bulamadi — panel bos kalacak. " +
-                               "Bileseni general_info_scheme prefab'ina ekleyin ya da " +
-                               "View alanina surukleyin.", this);
+                Debug.LogError("[View] HudPresenter could not find a HudView — the panel will stay empty. " +
+                               "Add the component to the general_info_scheme prefab or assign the View field.", this);
         }
 
-        #region Bağlanma
+        #region Binding
 
         /// <summary>
-        /// Core'a baglanir ve paneli o anki duruma esitler.
-        /// BoardManager, GameState + MatchContext kurulduktan HEMEN SONRA cagirir.
+        /// Connects to Core and syncs the panel with the current state.
+        /// BoardManager calls this RIGHT AFTER GameState + MatchContext are created.
         /// </summary>
         public void Bind(GameState board, MatchContext context)
         {
             if (board == null || context == null)
             {
-                Debug.LogError("[View] HudPresenter.Bind bos Core aldi; panel guncellenmeyecek.", this);
+                Debug.LogError("[View] HudPresenter.Bind received a null Core; the panel will not update.", this);
                 return;
             }
 
-            // Iki kez baglanirsa event'ler cift tetiklenmesin.
+            // Binding twice must not make events fire twice.
             Unbind();
 
             _board = board;
             _context = context;
 
-            _board.OnTurnChanged += HandleTurnChanged;
-            _board.OnTurnCountChanged += HandleTurnCountChanged;
-            _board.OnMoveExecuted += HandleMoveExecuted;
-            _board.OnMatchEnded += HandleMatchEnded;
+            _board.TurnChanged += HandleTurnChanged;
+            _board.TurnCountChanged += HandleTurnCountChanged;
+            _board.MoveExecuted += HandleMoveExecuted;
+            _board.MatchEnded += HandleMatchEnded;
 
-            _context.OnScoreChanged += HandleScoreChanged;
-            _context.OnGoldChanged += HandleGoldChanged;
-            _context.OnDiceRolled += HandleDiceRolled;
+            _context.ScoreChanged += HandleScoreChanged;
+            _context.GoldChanged += HandleGoldChanged;
+            _context.DiceRolled += HandleDiceRolled;
 
             RefreshAll();
         }
 
         /// <summary>
-        /// Abonelikleri soker. BoardManager.OnDestroy ile ayni gerekce: Core, yok edilmis
-        /// bir MonoBehaviour'i referansta tutarsa sahne degisiminde sizinti olur.
+        /// Removes the subscriptions. Same reason as BoardManager.OnDestroy: if Core keeps a reference to
+        /// a destroyed MonoBehaviour, it leaks on scene changes.
         /// </summary>
         public void Unbind()
         {
             if (_board != null)
             {
-                _board.OnTurnChanged -= HandleTurnChanged;
-                _board.OnTurnCountChanged -= HandleTurnCountChanged;
-                _board.OnMoveExecuted -= HandleMoveExecuted;
-                _board.OnMatchEnded -= HandleMatchEnded;
+                _board.TurnChanged -= HandleTurnChanged;
+                _board.TurnCountChanged -= HandleTurnCountChanged;
+                _board.MoveExecuted -= HandleMoveExecuted;
+                _board.MatchEnded -= HandleMatchEnded;
                 _board = null;
             }
 
             if (_context != null)
             {
-                _context.OnScoreChanged -= HandleScoreChanged;
-                _context.OnGoldChanged -= HandleGoldChanged;
-                _context.OnDiceRolled -= HandleDiceRolled;
+                _context.ScoreChanged -= HandleScoreChanged;
+                _context.GoldChanged -= HandleGoldChanged;
+                _context.DiceRolled -= HandleDiceRolled;
                 _context = null;
             }
         }
@@ -123,13 +131,13 @@ namespace Tavla.View
 
         #endregion
 
-        #region Tazeleme
+        #region Refresh
 
         /// <summary>
-        /// Butun slotlari modelden yeniden okur.
+        /// Re-reads every slot from the model.
         ///
-        /// Event'lere ek olarak bu metodun bulunmasi sart: baglanma anindaki degerler icin
-        /// hicbir event firlamaz, panel ilk zar atilana kadar bos kalirdi.
+        /// Required in addition to the events: no event fires for the values present at bind time,
+        /// so the panel would stay empty until the first dice roll.
         /// </summary>
         public void RefreshAll()
         {
@@ -143,8 +151,8 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// Gorev satirina disaridan metin yazar — ileride bir gorev/kontrat sistemi
-        /// geldiginde baglanacagi yer burasi. Kalan tur yazisinin uzerine gecer.
+        /// Writes custom text on the task line — the hook for a future quest/contract system.
+        /// Overrides the remaining-turns text.
         /// </summary>
         public void SetTask(string text)
         {
@@ -160,7 +168,7 @@ namespace Tavla.View
 
         #endregion
 
-        #region Core dinleyicileri
+        #region Core listeners
 
         private void HandleScoreChanged(int playerId, int score)
         {
@@ -179,7 +187,7 @@ namespace Tavla.View
             RefreshMoves();
         }
 
-        /// <summary>Hamle yapilinca bir zar harcanir; kalan haklar degisir.</summary>
+        /// <summary>A move spends a die; the remaining moves change.</summary>
         private void HandleMoveExecuted(MoveResult result)
         {
             RefreshMoves();
@@ -187,8 +195,8 @@ namespace Tavla.View
 
         private void HandleTurnChanged(int playerId)
         {
-            // Zar HENUZ atilmadi (BoardManager sirayi aldiktan sonra atiyor) — bu yuzden
-            // burada gorunen "-" dogru: yeni turun haklari daha belli degil.
+            // The dice are NOT rolled YET (BoardManager rolls after taking the turn) — so the "-" shown
+            // here is correct: the new turn's moves are not known yet.
             RefreshMoves();
         }
 
@@ -205,11 +213,11 @@ namespace Tavla.View
 
             string message;
             if (winnerId == GameState.NoWinner)
-                message = "BERABERE";
+                message = _drawText;
             else if (winnerId == _playerId)
-                message = "KAZANDIN";
+                message = _winText;
             else
-                message = "KAYBETTIN";
+                message = _loseText;
 
             _view.SetField(HudField.Task, message);
             _view.SetField(HudField.Moves, _emptyValue);
@@ -217,12 +225,12 @@ namespace Tavla.View
 
         #endregion
 
-        #region Biçimlendirme
+        #region Formatting
 
         /// <summary>
-        /// Kalan hamle haklari. Iki zar tuketim modu da ayni slotta gosterilir:
-        ///   Normal     : kalan zar degerleri ("5 3", cift atista "6 6 6 6"),
-        ///   FreeSplit  : bolunebilir tek havuz ("8") — Kartografin Hilesi aktifken.
+        /// Remaining moves. Both dice consumption modes are shown in the same slot:
+        ///   Normal     : the remaining die values ("5 3", "6 6 6 6" on a double),
+        ///   FreeSplit  : a single splittable pool ("8") — while Cartographer's Cheat is active.
         /// </summary>
         private string FormatMoves()
         {
@@ -252,7 +260,7 @@ namespace Tavla.View
 
         private string FormatTurns(int remaining)
         {
-            return _turnPrefix + remaining;
+            return _turnsRemainingPrefix + remaining;
         }
 
         #endregion

@@ -1,13 +1,11 @@
 namespace Tavla.Core.Runtime
 {
     /// <summary>
-    /// Kullanim hakki sayaci. Tek kullanimlik ogelerin ortak defter tutma isi burada,
-    /// TEK yerde yazili.
+    /// Usage charge counter. The shared bookkeeping of single-use items is written here, in ONE place.
     ///
-    /// Neden ayri bir sinif? Cunku her tek kullanimlik oge ayni ata siniftan turemek
-    /// zorunda kalmasin. Bir tilsim ConsumableRelic'ten tureyebilir ama ileride
-    /// eklenecek bir "tuzak karti" bambaska bir agacta olabilir — ikisi de bu havuzu
-    /// alan olarak tutar (kalitim degil kompozisyon).
+    /// Why a separate class? So that single-use items are not forced to derive from the same base class.
+    /// A relic may derive from ConsumableRelic, while a future "trap card" may live in a completely
+    /// different hierarchy — both hold this pool as a field (composition over inheritance).
     /// </summary>
     public class ChargePool
     {
@@ -22,7 +20,7 @@ namespace Tavla.Core.Runtime
             Remaining = Max;
         }
 
-        /// <summary>Bir hak harcar. Hak yoksa false doner ve sayac DEGISMEZ.</summary>
+        /// <summary>Spends one charge. Returns false and does NOT change the counter if none is left.</summary>
         public bool TryConsume()
         {
             if (IsEmpty)
@@ -32,13 +30,13 @@ namespace Tavla.Core.Runtime
             return true;
         }
 
-        /// <summary>Dukkanda yeniden dolum.</summary>
+        /// <summary>Recharge in the shop.</summary>
         public void Refill()
         {
             Remaining = Max;
         }
 
-        /// <summary>Tavani asmadan hak ekler.</summary>
+        /// <summary>Adds charges without exceeding the maximum.</summary>
         public void Grant(int amount)
         {
             Remaining += amount;

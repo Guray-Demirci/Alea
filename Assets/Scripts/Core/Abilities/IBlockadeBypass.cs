@@ -3,12 +3,12 @@ using Tavla.Core.Board;
 namespace Tavla.Core.Abilities
 {
     /// <summary>
-    /// Hayalet Pul: "Rakibin kapilarinin uzerinden atlayabilir, blokajlari yok sayar."
-    /// Hamle DOGRULAMA asamasinda sorulur, bu yuzden yan etkisiz olmalidir.
+    /// Ghost Checker: "Can jump over the opponent's points and ignores blockades."
+    /// Queried during move VALIDATION, so implementations must be free of side effects.
     /// </summary>
     public interface IBlockadeBypass : ICheckerAbility
     {
-        /// <summary>Bu hedef hanedeki blokaj yok sayilabilir mi?</summary>
+        /// <summary>Can the blockade on the target point be ignored?</summary>
         bool CanBypassBlockade(Node target);
     }
 }

@@ -3,8 +3,8 @@ using Tavla.Core.Board;
 namespace Tavla.Core.AI
 {
     /// <summary>
-    /// Botun degerlendirdigi tek bir aday hamle.
-    /// ToIndex == GameState.BearOffIndex ise bu bir toplama hamlesidir.
+    /// A single candidate move evaluated by the bot.
+    /// When <see cref="ToIndex"/> equals <see cref="GameState.BearOffIndex"/> the move is a bear-off.
     /// </summary>
     public readonly struct BotMove
     {
@@ -12,7 +12,7 @@ namespace Tavla.Core.AI
         public readonly int FromIndex;
         public readonly int ToIndex;
 
-        /// <summary>Bu hamle uygulandiktan sonra tahtanin aldigi sezgisel puan.</summary>
+        /// <summary>Heuristic score of the board after this move is applied.</summary>
         public readonly int Score;
 
         public bool IsBearOff => ToIndex == GameState.BearOffIndex;
@@ -25,7 +25,7 @@ namespace Tavla.Core.AI
             Score = score;
         }
 
-        /// <summary>Oynanacak hamle bulunamadi.</summary>
+        /// <summary>No playable move was found.</summary>
         public static BotMove None => default(BotMove);
     }
 }

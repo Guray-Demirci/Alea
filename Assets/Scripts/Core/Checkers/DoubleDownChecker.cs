@@ -6,16 +6,16 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Gele Pulu (Double Down). "%25 ihtimalle o el attigin zarlardan birini cift saydirir
-    /// (ekstra hamle hakki), %50 ihtimalle o eldeki kalan tum hamle haklarini kaybedersin."
-    /// Klasik "yuksek risk / yuksek kazanc" pulu.
+    /// Double Down Checker. "25% chance that one of this turn's dice counts twice (an extra move),
+    /// 50% chance that you lose all remaining moves of this turn."
+    /// The classic "high risk / high reward" checker.
     /// </summary>
     public class DoubleDownChecker : BaseChecker, IMoveReactor, IPermanent
     {
         public const string Id = "checker_doubledown";
 
-        private const int BonusThreshold = 25;   // %25 kazanc
-        private const int PenaltyThreshold = 75; // sonraki %50 ceza
+        private const int BonusThreshold = 25;   // 25% reward
+        private const int PenaltyThreshold = 75; // the next 50% penalty
 
         public override string TypeId => Id;
 
@@ -28,23 +28,23 @@ namespace Tavla.Core.Checkers
 
             if (roll < BonusThreshold)
             {
-                // Ekstra hamle: son kullanilan zar degeri kadar.
+                // Extra move worth the first die of the roll.
                 int bonusValue = context.CurrentRoll.First;
                 context.CurrentRoll.GrantExtraMove(bonusValue);
-                context.Board.ReportAbility("DoubleDownBonus", this, result.ToIndex);
+                context.Board.ReportAbility(AbilityIds.DoubleDownBonus, this, result.ToIndex);
             }
             else if (roll < PenaltyThreshold)
             {
                 context.CurrentRoll.LoseRemainingMoves();
-                context.Board.ReportAbility("DoubleDownPenalty", this, result.ToIndex);
+                context.Board.ReportAbility(AbilityIds.DoubleDownPenalty, this, result.ToIndex);
             }
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Gele Pulu";
+        public string DisplayName => "Double Down Checker";
         public int Price => 380;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public DoubleDownChecker(int ownerId) : base(ownerId) { }

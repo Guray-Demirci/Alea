@@ -5,9 +5,9 @@ using Tavla.Core.Interfaces;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Parazit Pul. "Rakibin kapi aldigi (en az 2 pulunun oldugu) bir haneye sinsice sizabilir."
-    /// Sizma sirasinda KIRMA yapilmaz; rakiple ayni hanede birlikte durur.
-    /// Node sinifinin cok sahipli hale getirilmesinin sebebi tam olarak bu puldur.
+    /// Parasite Checker. "Can sneak onto a point the opponent has made (a point with at least 2 of their checkers)."
+    /// No capture happens during infiltration; it shares the point with the opponent.
+    /// This checker is exactly why the Node class supports multiple owners.
     /// </summary>
     public class ParasiteChecker : BaseChecker, IInfiltrator, IPermanent
     {
@@ -15,14 +15,14 @@ namespace Tavla.Core.Checkers
 
         public override string TypeId => Id;
 
-        /// <summary>Sadece gercek bir KAPIYA sizar (2+ rakip pulu). Tek acik pulu normal kurallarla kirar.</summary>
+        /// <summary>Infiltrates only a real MADE POINT (2+ enemy checkers). A single blot is captured by the normal rules.</summary>
         public bool CanInfiltrate(Node target) => target.CountEnemiesOf(OwnerId) >= 2;
 
         public string ItemId => Id;
-        public string DisplayName => "Parazit Pul";
+        public string DisplayName => "Parasite Checker";
         public int Price => 420;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public ParasiteChecker(int ownerId) : base(ownerId) { }

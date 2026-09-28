@@ -1,0 +1,45 @@
+# Normalize line endings: text files are stored with LF in the repository.
+* text=auto
+
+# Source and config
+*.cs        text diff=csharp
+*.asmdef    text
+*.json      text
+*.md        text
+*.shader    text
+*.hlsl      text
+
+# Unity YAML assets. Unity writes LF on every platform; keep them LF in the working tree too.
+# Smart merging requires the UnityYAMLMerge driver to be registered once per clone, e.g.:
+#   git config merge.unityyamlmerge.name "Unity SmartMerge"
+#   git config merge.unityyamlmerge.driver "'<UnityEditorPath>/Data/Tools/UnityYAMLMerge.exe' merge -p %O %B %A %A"
+# Without the driver git falls back to its normal text merge.
+*.unity             text eol=lf merge=unityyamlmerge
+*.prefab            text eol=lf merge=unityyamlmerge
+*.asset             text eol=lf merge=unityyamlmerge
+*.meta              text eol=lf merge=unityyamlmerge
+*.mat               text eol=lf merge=unityyamlmerge
+*.anim              text eol=lf merge=unityyamlmerge
+*.controller        text eol=lf merge=unityyamlmerge
+*.overrideController text eol=lf merge=unityyamlmerge
+*.physicsMaterial2D text eol=lf merge=unityyamlmerge
+*.spriteatlas       text eol=lf merge=unityyamlmerge
+*.spriteatlasv2     text eol=lf merge=unityyamlmerge
+*.inputactions      text eol=lf
+
+# Binary assets: never diff or merge as text.
+# (For large art/audio libraries consider Git LFS: replace "binary" with "filter=lfs diff=lfs merge=lfs -text"
+#  after running `git lfs install`, then migrate existing files with `git lfs migrate import`.)
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.psd       binary
+*.aseprite  binary
+*.ase       binary
+*.wav       binary
+*.mp3       binary
+*.ogg       binary
+*.ttf       binary
+*.otf       binary
+*.fbx       binary
+*.dll       binary

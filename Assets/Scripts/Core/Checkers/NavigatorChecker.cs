@@ -7,10 +7,10 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Kasif Pulu (The Navigator). "Tahtada ilerledikce arkasinda ayak izi birakir.
-    /// Bastigi HER YENI hane icin 50 taban puan verir."
-    /// "Yeni" olmasi onemli: ayni haneye tekrar gelirse puan yazilmaz, bu yuzden pul
-    /// kendi gezdigi haneleri hatirlamak zorunda (durum pulun kendisine ait, SRP).
+    /// Navigator Checker. "Leaves footprints behind as it advances.
+    /// Grants 50 base points for EVERY NEW point it lands on."
+    /// "New" matters: landing on the same point again scores nothing, so the checker must
+    /// remember the points it has visited (the state belongs to the checker itself, SRP).
     /// </summary>
     public class NavigatorChecker : BaseChecker, IMoveReactor, IPermanent
     {
@@ -21,7 +21,7 @@ namespace Tavla.Core.Checkers
 
         public override string TypeId => Id;
 
-        /// <summary>View'in haritaya ayak izi cizmesi icin gezilen haneler.</summary>
+        /// <summary>Visited points, so the View can draw the footprint trail.</summary>
         public IEnumerable<int> VisitedNodes => _visited;
 
         public void OnMoveCompleted(IMatchContext context, MoveResult result, bool isMover)
@@ -29,19 +29,19 @@ namespace Tavla.Core.Checkers
             if (!isMover)
                 return;
 
-            // Add false donerse hane daha once gezilmistir -> puan yok.
+            // Add returns false if the point was visited before -> no score.
             if (!_visited.Add(result.ToIndex))
                 return;
 
             context.AddScore(OwnerId, ScorePerNewNode);
-            context.Board.ReportAbility("NavigatorTrail", this, result.ToIndex);
+            context.Board.ReportAbility(AbilityIds.NavigatorTrail, this, result.ToIndex);
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Kaşif Pulu";
+        public string DisplayName => "Navigator Checker";
         public int Price => 320;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public NavigatorChecker(int ownerId) : base(ownerId) { }

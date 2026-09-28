@@ -1,11 +1,12 @@
+using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Runtime;
 
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// C8 - Korsan Koyu / Talan Hanesi. "Bu hanede duran pulun, o tur urettigi TUM skor puanlarini sifirlar."
-    /// Tur sonunda calisir, cunku sifirlanacak puanin once uretilmis olmasi gerekir.
+    /// Plunder Cove Tile. "Resets ALL score points produced this turn by the player whose checker stands here."
+    /// Runs at the end of the turn, because the score to be reset must have been produced first.
     /// </summary>
     public class PlunderCoveTile : BaseTileEffect
     {
@@ -18,10 +19,10 @@ namespace Tavla.Core.Tiles
             if (node.IsEmpty)
                 return;
 
-            // Ayni oyuncuyu iki kez sifirlamamak icin sahipleri isaretleyerek geziyoruz.
+            // Mark owners as we go so the same player is not reset twice.
             bool[] plundered = new bool[GameState.PlayerCount];
 
-            for (int i = 0; i < node.StoneCount; i++)
+            for (int i = 0; i < node.CheckerCount; i++)
             {
                 int ownerId = node.Checkers[i].OwnerId;
                 if (plundered[ownerId])
@@ -29,7 +30,7 @@ namespace Tavla.Core.Tiles
 
                 plundered[ownerId] = true;
                 context.ResetTurnScore(ownerId);
-                context.Board.ReportAbility("Plundered", node.Checkers[i], node.Index);
+                context.Board.ReportAbility(AbilityIds.Plundered, node.Checkers[i], node.Index);
             }
         }
     }

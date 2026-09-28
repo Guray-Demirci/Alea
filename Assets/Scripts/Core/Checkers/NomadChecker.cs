@@ -5,9 +5,9 @@ using Tavla.Core.Interfaces;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Gocebe Pul. "Bastigi hanenin sagindaki ve solundaki haneler tamamen bossa,
-    /// fazladan 3 hane daha ileri gitme hakki kazanir."
-    /// Bonus ZAR DEGERINE eklenir, ekstra hamle hakki dogurmaz: 3 zariyla 6 hane gider.
+    /// Nomad Checker. "If the points to the left and right of its current point are completely empty,
+    /// it may move 3 extra points."
+    /// The bonus is added to the DIE VALUE and grants no extra move: with a 3 it travels 6 points.
     /// </summary>
     public class NomadChecker : BaseChecker, IExtraDistanceProvider, IPermanent
     {
@@ -18,7 +18,7 @@ namespace Tavla.Core.Checkers
 
         public int GetBonusDistance(GameState state, int fromIndex)
         {
-            // Bardan giriste "komsu hane" kavrami yok -> bonus verilmez.
+            // Entering from the bar has no "neighbouring point" -> no bonus.
             if (!GameState.IsOnBoard(fromIndex))
                 return 0;
 
@@ -27,17 +27,17 @@ namespace Tavla.Core.Checkers
                 : 0;
         }
 
-        /// <summary>Tahta kenari da "bos" sayilir — orada engelleyecek pul zaten olamaz.</summary>
+        /// <summary>The board edge also counts as "empty" — no checker can block from there.</summary>
         private static bool IsSideEmpty(GameState state, int index)
         {
             return !GameState.IsOnBoard(index) || state.Nodes[index].IsEmpty;
         }
 
         public string ItemId => Id;
-        public string DisplayName => "Göçebe Pul";
+        public string DisplayName => "Nomad Checker";
         public int Price => 300;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
 
         public NomadChecker(int ownerId) : base(ownerId) { }

@@ -6,9 +6,9 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// B - Ikiz Pul (Gemini). "Dukkandan her zaman CIFT olarak satilir. Iki pulu yan yana
-    /// iki haneye getirmeyi basarirsan fazladan puan ve carpan kazanirsin."
-    /// PairId ile esini tanir; CreatePair() disinda tek basina uretilmemelidir.
+    /// Gemini Checker. "Always sold as a PAIR in the shop. If you manage to bring both checkers
+    /// onto two adjacent points you earn extra score and a multiplier."
+    /// It recognizes its twin through <see cref="PairId"/>; it must never be created alone outside <see cref="CreatePair"/>.
     /// </summary>
     public class GeminiChecker : BaseChecker, IMoveReactor, IPermanent
     {
@@ -17,7 +17,7 @@ namespace Tavla.Core.Checkers
         private const int AdjacencyScore = 200;
         private const float AdjacencyMultiplier = 1.5f;
 
-        /// <summary>Ayni PairId'ye sahip iki pul birbirinin ikizidir.</summary>
+        /// <summary>Two checkers with the same PairId are twins.</summary>
         public int PairId { get; private set; }
 
         public override string TypeId => Id;
@@ -27,7 +27,7 @@ namespace Tavla.Core.Checkers
             PairId = pairId;
         }
 
-        /// <summary>Dukkan bu pulu tek satamaz — uretim her zaman cifttir.</summary>
+        /// <summary>The shop cannot sell this checker alone — it is always created as a pair.</summary>
         public static GeminiChecker[] CreatePair(int ownerId, int pairId)
         {
             return new[]
@@ -39,7 +39,7 @@ namespace Tavla.Core.Checkers
 
         public void OnMoveCompleted(IMatchContext context, MoveResult result, bool isMover)
         {
-            // Sadece hareket eden ikiz kontrol etsin ki bonus iki kez yazilmasin.
+            // Only the moving twin checks, so the bonus is not written twice.
             if (!isMover)
                 return;
 
@@ -49,7 +49,7 @@ namespace Tavla.Core.Checkers
 
             context.AddScore(OwnerId, AdjacencyScore);
             context.AddScoreMultiplier(OwnerId, AdjacencyMultiplier, false);
-            context.Board.ReportAbility("GeminiLink", this, myIndex);
+            context.Board.ReportAbility(AbilityIds.GeminiLink, this, myIndex);
         }
 
         private bool IsTwinAt(IMatchContext context, int index)
@@ -58,7 +58,7 @@ namespace Tavla.Core.Checkers
                 return false;
 
             Node node = context.Board.Nodes[index];
-            for (int i = 0; i < node.StoneCount; i++)
+            for (int i = 0; i < node.CheckerCount; i++)
             {
                 GeminiChecker twin = node.Checkers[i] as GeminiChecker;
                 if (twin != null && !ReferenceEquals(twin, this) && twin.PairId == PairId)
@@ -68,10 +68,10 @@ namespace Tavla.Core.Checkers
         }
 
         public string ItemId => Id;
-        public string DisplayName => "İkiz Pul (Çift)";
+        public string DisplayName => "Gemini Checker (Pair)";
         public int Price => 700;
 
-        /// <summary>Ayni puldan birden fazlasi desteye konabilir.</summary>
+        /// <summary>More than one copy of this checker can be put in the deck.</summary>
         public bool AllowsDuplicates => true;
     }
 }

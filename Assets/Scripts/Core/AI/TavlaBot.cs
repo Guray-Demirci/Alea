@@ -4,19 +4,18 @@ using Tavla.Core.Board;
 namespace Tavla.Core.AI
 {
     /// <summary>
-    /// Tek hamle derinlikli (greedy) yapay zeka.
+    /// One-ply (greedy) AI.
     ///
-    /// Calisma sekli: her aday hamle icin tahtanin bir KLONUNU alir, hamleyi klonda
-    /// oynar, sonucu puanlar ve en yuksek puanliyi secer. Klon gercek tahtayi
-    /// etkilemez cunku GameState.IsSimulation bayragi yan etkili kancalari kapatir.
+    /// How it works: for every candidate move it takes a CLONE of the board, plays the move
+    /// on the clone, scores the result and picks the highest-scoring move. The clone never
+    /// affects the real board because <see cref="GameState.IsSimulation"/> disables side-effect hooks.
     ///
-    /// Kural bilgisi burada YOKTUR. "Bu hamle gecerli mi?" sorusunu hep Core'a
-    /// soruyor (GetLegalTargets / CanBearOff / TryMove) — bot da View gibi
-    /// kurallarin tuketicisi, sahibi degil.
+    /// There is NO rule knowledge here. "Is this move legal?" is always asked of Core
+    /// (GetLegalTargets / CanBearOff / TryMove) — like the View, the bot is a consumer of the rules, not their owner.
     /// </summary>
     public class TavlaBot
     {
-        #region Kimlik
+        #region Identity
 
         private readonly int _myPlayerId;
         private readonly int _opponentId;
@@ -31,60 +30,64 @@ namespace Tavla.Core.AI
 
         #endregion
 
-        #region Agirliklar
+        #region Weights
 
-        // Sezgisel puanin ayar dugmeleri. Botu sertlestirmek/yumusatmak icin tek yer burasi.
-        private const int BarPenalty        = 10000; // Kendi pulumuz kirildi — felaket
-        private const int BarReward         = 1000;  // Rakibi kirdik
-        private const int BorneOffReward    = 5000;  // Pul topladik — nihai hedef
-        private const int BlotPenalty       = 300;   // Acik verdik, kirilabiliriz
-        private const int PointReward       = 200;   // Kapi aldik, guvendeyiz
-        private const int ProgressPerStep   = 10;    // Eve yaklasma
+        // Tuning knobs of the heuristic. This is the single place to make the bot harder or softer.
+        private const int BarPenalty        = 10000; // One of our checkers was hit — disaster
+        private const int BarReward         = 1000;  // We hit an opponent checker
+        private const int BorneOffReward    = 5000;  // We bore off a checker — the ultimate goal
+        private const int BlotPenalty       = 300;   // We left a blot that can be hit
+        private const int PointReward       = 200;   // We made a point and are safe
+        private const int ProgressPerStep   = 10;    // Moving closer to home
 
         #endregion
 
-        #region Degerlendirme
+        // Reused between calls so move selection does not allocate new lists every time.
+        private readonly List<int> _sources = new List<int>(GameState.NodeCount);
+        private readonly List<int> _targets = new List<int>(GameState.NodeCount);
+
+        #region Evaluation
 
         /// <summary>
-        /// Yapay zekanin beyni. Verilen tahta manzarasina bakar ve bir puan bicer.
-        /// Puan ne kadar yuksekse, tahtanin o anki durumu AI icin o kadar iyidir.
+        /// The bot's brain. Looks at a board position and assigns a score.
+        /// The higher the score, the better the position is for the bot.
         /// </summary>
         public int EvaluateBoard(GameState virtualBoard)
         {
             int score = 0;
 
-            // ---------- 1) KIRMA VE KIRILMA ----------
+            // ---------- 1) HITTING AND BEING HIT ----------
             score -= virtualBoard.GetBarCount(_myPlayerId) * BarPenalty;
             score += virtualBoard.GetBarCount(_opponentId) * BarReward;
 
-            // ---------- 2) TOPLANAN PULLAR (Nihai hedef) ----------
-            // Rakibin topladiklari da hesaba katiliyor: arcade modunda kazanan skora gore
-            // belirlendigi icin rakip 14 pul toplarken oturup seyretmek olmaz.
+            // ---------- 2) BORNE-OFF CHECKERS (the ultimate goal) ----------
+            // The opponent's borne-off checkers count too: in arcade mode the winner is decided
+            // by score, so the bot must not sit idle while the opponent bears off 14 checkers.
             score += virtualBoard.GetBorneOffCount(_myPlayerId) * BorneOffReward;
             score -= virtualBoard.GetBorneOffCount(_opponentId) * BorneOffReward;
 
-            // ---------- 3) TAHTA DURUMU (Aciklar, kapilar, ilerleme) ----------
+            // ---------- 3) BOARD SHAPE (blots, points, progress) ----------
             for (int i = 0; i < GameState.NodeCount; i++)
             {
                 Node node = virtualBoard.Nodes[i];
 
-                // DIKKAT: "node.Checkers[0].OwnerId == benim" DEGIL.
-                // Parazit Pul rakip hanesine sizabildigi icin bir hanede iki oyuncunun
-                // pulu birden bulunabiliyor; sayim oyuncu bazli yapilmak zorunda.
+                // NOTE: NOT "node.Checkers[0].OwnerId == me".
+                // The Parasite Checker can infiltrate enemy points, so a point may hold checkers
+                // of both players; counting must be done per player.
                 int myCount = node.CountFor(_myPlayerId);
                 if (myCount == 0)
                     continue;
 
                 if (myCount == 1)
-                    score -= BlotPenalty;   // Acik (blot)
+                    score -= BlotPenalty;   // Blot
                 else
-                    score += PointReward;   // Kapi (blokaj)
+                    score += PointReward;   // Made point (blockade)
 
-                // Ilerleme: 1 = bitise en yakin, 24 = en uzak.
+                // Progress: 1 = closest to finishing, 24 = furthest away.
                 int distanceToFinish = GameState.GetBearOffDistance(i, _myPlayerId);
 
-                // Hanedeki pul SAYISIYLA carpiliyor: 5 pullu bir hanenin ilerlemesi
-                // 1 pullu haneyle ayni sayilirsa bot yiginlari ileri tasimayi hic istemez.
+                // Multiplied by the checker COUNT: if a 5-checker stack counted the same as a
+                // single checker, the bot would never want to move stacks forward.
                 score += (GameState.NodeCount - distanceToFinish) * ProgressPerStep * myCount;
             }
 
@@ -93,11 +96,11 @@ namespace Tavla.Core.AI
 
         #endregion
 
-        #region Hamle secimi
+        #region Move selection
 
         /// <summary>
-        /// Tum gecerli hamleleri deneyip en yuksek puanliyi secer.
-        /// Tahtayi DEGISTIRMEZ — denemeler klon uzerinde yapilir.
+        /// Tries every legal move and picks the highest-scoring one.
+        /// Does NOT change the board — all attempts are made on clones.
         /// </summary>
         public BotMove ChooseBestMove(GameState board)
         {
@@ -107,29 +110,29 @@ namespace Tavla.Core.AI
             BotMove best = BotMove.None;
             int bestScore = int.MinValue;
 
-            List<int> sources = CollectSources(board);
+            CollectSources(board, _sources);
 
-            for (int s = 0; s < sources.Count; s++)
+            for (int s = 0; s < _sources.Count; s++)
             {
-                int from = sources[s];
+                int from = _sources[s];
 
-                // --- Tahta ustundeki hedefler ---
-                List<int> targets = board.GetLegalTargets(from);
-                for (int t = 0; t < targets.Count; t++)
+                // --- Targets on the board ---
+                board.GetLegalTargets(from, _targets);
+                for (int t = 0; t < _targets.Count; t++)
                 {
                     int value;
-                    if (!TrySimulate(board, from, targets[t], out value))
+                    if (!TrySimulate(board, from, _targets[t], out value))
                         continue;
 
                     if (value > bestScore)
                     {
                         bestScore = value;
-                        best = new BotMove(from, targets[t], value);
+                        best = new BotMove(from, _targets[t], value);
                     }
                 }
 
-                // --- Toplama (bear-off) ---
-                // GetLegalTargets sadece 0-23 hanelerini tariyor; toplama ayri sorulmali.
+                // --- Bear-off ---
+                // GetLegalTargets only scans points 0-23; bearing off must be queried separately.
                 if (board.CanBearOff(from))
                 {
                     int value;
@@ -145,8 +148,8 @@ namespace Tavla.Core.AI
         }
 
         /// <summary>
-        /// En iyi hamleyi GERCEK tahtada oynar. Oynanacak hamle kalmadiysa false doner —
-        /// cagiran taraf bunu "turu bitir" sinyali olarak kullanir.
+        /// Plays the best move on the REAL board. Returns false when no move is left —
+        /// the caller uses this as the "end the turn" signal.
         /// </summary>
         public bool PlayOneMove(GameState board)
         {
@@ -159,20 +162,20 @@ namespace Tavla.Core.AI
 
         #endregion
 
-        #region Yardimcilar
+        #region Helpers
 
         /// <summary>
-        /// Hamlenin oynanabilecegi kaynak haneler.
-        /// Kirik pul varsa kural geregi baska hicbir hamle yapilamaz — tek kaynak bardir.
+        /// Source points from which a move can be played.
+        /// If a checker is on the bar no other move is allowed — the bar is the only source.
         /// </summary>
-        private List<int> CollectSources(GameState board)
+        private void CollectSources(GameState board, List<int> sources)
         {
-            List<int> sources = new List<int>();
+            sources.Clear();
 
             if (board.GetBarCount(_myPlayerId) > 0)
             {
                 sources.Add(GameState.BarIndex);
-                return sources;
+                return;
             }
 
             for (int i = 0; i < GameState.NodeCount; i++)
@@ -180,13 +183,11 @@ namespace Tavla.Core.AI
                 if (board.Nodes[i].CountFor(_myPlayerId) > 0)
                     sources.Add(i);
             }
-
-            return sources;
         }
 
         /// <summary>
-        /// Hamleyi bir klonda oynayip sonucu puanlar. Klonda tutmazsa false doner.
-        /// Gercek tahtaya, gercek zarlara ve gercek pullarin ic durumuna dokunmaz.
+        /// Plays the move on a clone and scores the result. Returns false if the move fails on the clone.
+        /// Never touches the real board, the real dice or the internal state of real checkers.
         /// </summary>
         private bool TrySimulate(GameState board, int from, int to, out int value)
         {

@@ -6,11 +6,16 @@ using Tavla.Core.Relics;
 namespace Tavla.Core.Runtime
 {
     /// <summary>
-    /// IMatchContext'in calisan implementasyonu: skor, altin, carpan, dukkan ve zar durumunu tutar.
-    /// Yetenekler bu sinifi degil, ARAYUZUNU gorur — testte sahte bir context takmak serbesttir.
+    /// Working implementation of <see cref="IMatchContext"/>: holds score, gold, multipliers, shop and dice state.
+    /// Abilities see its INTERFACE, not this class — plugging in a fake context in tests is free.
     /// </summary>
     public class MatchContext : IMatchContext
     {
+        /// <summary>
+        /// Toll Booth debt rule: for every gold the player cannot pay, this many score points are deducted.
+        /// </summary>
+        public const int ScorePenaltyPerMissingGold = 10;
+
         private readonly int[] _turnScore;
         private readonly int[] _totalScore;
         private readonly int[] _gold;
@@ -25,28 +30,41 @@ namespace Tavla.Core.Runtime
         public IRandomProvider Random { get; private set; }
         public DiceRoll CurrentRoll { get; private set; }
 
-        /// <summary>Fedakar Pul'un biriktirdigi kalici dukkan indirimi (altin).</summary>
+        /// <summary>Permanent shop discount (gold) accumulated by the Sacrificial Checker.</summary>
         public int ShopDiscount { get; private set; }
 
-        /// <summary>Anka Pulu'nun tetikledigi "Kullerinden Dogus" vitrini aktif mi?</summary>
+        /// <summary>Is the "Rise from the Ashes" luxury shop triggered by the Phoenix Checker pending?</summary>
         public bool LuxuryShopPending { get; private set; }
 
-        #region Olaylar (Core -> View)
+        #region Events (Core -> View)
 
-        public event Action<int, int> OnScoreChanged;   // (playerId, toplam skor)
-        public event Action<int, int> OnGoldChanged;    // (playerId, toplam altin)
-        public event Action<int, float> OnMultiplierChanged;
-        public event Action<int> OnTurnSkipped;
-        public event Action<DiceRoll> OnDiceRolled;
-        public event Action<int> OnShopDiscountChanged;
-        public event Action<int> OnLuxuryShopTriggered;
+        /// <summary>(playerId, total score)</summary>
+        public event Action<int, int> ScoreChanged;
+
+        /// <summary>(playerId, total gold)</summary>
+        public event Action<int, int> GoldChanged;
+
+        /// <summary>(playerId, effective multiplier = turn x permanent)</summary>
+        public event Action<int, float> MultiplierChanged;
+
+        /// <summary>(playerId whose turn will be skipped)</summary>
+        public event Action<int> TurnSkipped;
+
+        /// <summary>(new roll of the current player)</summary>
+        public event Action<DiceRoll> DiceRolled;
+
+        /// <summary>(total shop discount)</summary>
+        public event Action<int> ShopDiscountChanged;
+
+        /// <summary>(playerId who triggered the luxury shop)</summary>
+        public event Action<int> LuxuryShopTriggered;
 
         #endregion
 
         public MatchContext(GameState board, IRandomProvider random)
         {
-            Board = board;
-            Random = random;
+            Board = board ?? throw new ArgumentNullException(nameof(board));
+            Random = random ?? throw new ArgumentNullException(nameof(random));
             _roller = new DiceRoller(random);
 
             int players = GameState.PlayerCount;
@@ -63,81 +81,103 @@ namespace Tavla.Core.Runtime
                 _permanentMultiplier[p] = 1f;
             }
 
-            // Iki fazli kurulum: tahtaya kendimizi tanitiyoruz ki yetenekler context'e ulasabilsin.
+            // Two-phase setup: introduce ourselves to the board so abilities can reach the context.
             Board.Bind(this);
         }
 
-        #region Skor
+        #region Score
 
         public int AddScore(int playerId, int amount)
         {
-            // Carpanlar burada uygulanir; pullar sadece HAM puan gonderir (SRP).
-            float multiplier = _turnMultiplier[playerId] * _permanentMultiplier[playerId];
-            int final = (int)(amount * multiplier);
+            ThrowIfInvalidPlayer(playerId);
+
+            // Multipliers are applied here; checkers only send the RAW score (SRP).
+            // Rounded (not truncated) so float error such as 14.9999 never loses a point.
+            double multiplier = (double)_turnMultiplier[playerId] * _permanentMultiplier[playerId];
+            int final = (int)Math.Round(amount * multiplier, MidpointRounding.AwayFromZero);
 
             _turnScore[playerId] += final;
             _totalScore[playerId] += final;
 
-            OnScoreChanged?.Invoke(playerId, _totalScore[playerId]);
+            ScoreChanged?.Invoke(playerId, _totalScore[playerId]);
+
+            // Every score — rule engine and abilities alike — passes through here, so this is the one
+            // reliable place to let the board check the target. The View has already seen the new score
+            // (event above) by the time the match may end.
+            Board.NotifyScoreChanged(playerId, _totalScore[playerId]);
             return final;
         }
 
         public void AddScoreMultiplier(int playerId, float multiplier, bool permanent)
         {
+            ThrowIfInvalidPlayer(playerId);
+
             if (permanent)
                 _permanentMultiplier[playerId] *= multiplier;
             else
                 _turnMultiplier[playerId] *= multiplier;
 
-            OnMultiplierChanged?.Invoke(playerId, _turnMultiplier[playerId] * _permanentMultiplier[playerId]);
+            MultiplierChanged?.Invoke(playerId, _turnMultiplier[playerId] * _permanentMultiplier[playerId]);
         }
 
-        /// <summary>Korsan Koyu: o turda kazanilan puani geri alir.</summary>
+        /// <summary>Plunder Cove: takes back the score earned during this turn.</summary>
         public void ResetTurnScore(int playerId)
         {
+            ThrowIfInvalidPlayer(playerId);
+
             _totalScore[playerId] -= _turnScore[playerId];
             _turnScore[playerId] = 0;
 
-            OnScoreChanged?.Invoke(playerId, _totalScore[playerId]);
+            ScoreChanged?.Invoke(playerId, _totalScore[playerId]);
         }
 
-        public int GetScore(int playerId) => _totalScore[playerId];
+        public int GetScore(int playerId)
+        {
+            ThrowIfInvalidPlayer(playerId);
+            return _totalScore[playerId];
+        }
 
         #endregion
 
-        #region Ekonomi
+        #region Economy
 
         public void AddGold(int playerId, int amount)
         {
+            ThrowIfInvalidPlayer(playerId);
+
             _gold[playerId] += amount;
 
-            // Haydut Kampi: "altinin eksiye dusmez ama o el kazandigin skordan puan siler."
+            // Toll Booth: "your gold never goes negative, but the debt is deducted from the score you earned."
             if (_gold[playerId] < 0)
             {
                 int debt = -_gold[playerId];
                 _gold[playerId] = 0;
-                _totalScore[playerId] -= debt * 10;
-                OnScoreChanged?.Invoke(playerId, _totalScore[playerId]);
+                _totalScore[playerId] -= debt * ScorePenaltyPerMissingGold;
+                ScoreChanged?.Invoke(playerId, _totalScore[playerId]);
             }
 
-            OnGoldChanged?.Invoke(playerId, _gold[playerId]);
+            GoldChanged?.Invoke(playerId, _gold[playerId]);
         }
 
-        public int GetGold(int playerId) => _gold[playerId];
+        public int GetGold(int playerId)
+        {
+            ThrowIfInvalidPlayer(playerId);
+            return _gold[playerId];
+        }
 
         public void AddShopDiscount(int amount)
         {
             ShopDiscount += amount;
-            OnShopDiscountChanged?.Invoke(ShopDiscount);
+            ShopDiscountChanged?.Invoke(ShopDiscount);
         }
 
         public void TriggerLuxuryShop(int playerId)
         {
             LuxuryShopPending = true;
-            OnLuxuryShopTriggered?.Invoke(playerId);
+            LuxuryShopTriggered?.Invoke(playerId);
         }
 
-        /// <summary>Dukkan asamasi vitrini kurduktan sonra bayragi temizler.</summary>
+        /// <summary>Clears the flag after the shop phase has set up the luxury storefront.</summary>
         public void ConsumeLuxuryShop()
         {
             LuxuryShopPending = false;
@@ -145,20 +185,23 @@ namespace Tavla.Core.Runtime
 
         #endregion
 
-        #region Tur / Zar
+        #region Turn / dice
 
         public void SkipTurn(int playerId)
         {
+            ThrowIfInvalidPlayer(playerId);
+
             Board.RequestSkipTurn(playerId);
-            OnTurnSkipped?.Invoke(playerId);
+            TurnSkipped?.Invoke(playerId);
         }
 
         public void PinNextDie(int playerId, int value)
         {
+            ThrowIfInvalidPlayer(playerId);
             _pinnedDie[playerId] = value;
         }
 
-        /// <summary>Kalici zar tilsimlarini (Ikiz Ruzgarlar, Firtina Raporu) kaydeder.</summary>
+        /// <summary>Registers permanent dice relics (Twin Winds, Storm Report).</summary>
         public void RegisterDiceModifier(IDiceModifier modifier)
         {
             if (modifier != null && !_diceModifiers.Contains(modifier))
@@ -171,27 +214,36 @@ namespace Tavla.Core.Runtime
         }
 
         /// <summary>
-        /// Tur basinda zar atar: once sabitlenmis zar uygulanir, sonra tilsimlar sirayla calisir.
+        /// Rolls the dice at the start of a turn: the pinned die is applied first, then relics run in order.
         /// </summary>
         public DiceRoll RollDice(int playerId)
         {
+            ThrowIfInvalidPlayer(playerId);
+
             CurrentRoll = _roller.Roll(_diceModifiers);
 
-            // Sabitleyici Pul / Meridyen Kaymasi: bir zar kesin olarak belirlenen degere oturur.
+            // Anchor Checker / Meridian Shift: one die settles on the pinned value.
             if (_pinnedDie[playerId] > 0)
             {
                 CurrentRoll.OverrideDie(true, _pinnedDie[playerId]);
                 _pinnedDie[playerId] = 0;
             }
 
-            // Turun skor carpani sifirlanir; kalici carpan (Kusatma) korunur.
+            // The turn multiplier resets; the permanent multiplier (Siege) is kept.
             _turnMultiplier[playerId] = 1f;
             _turnScore[playerId] = 0;
 
-            OnDiceRolled?.Invoke(CurrentRoll);
+            DiceRolled?.Invoke(CurrentRoll);
             return CurrentRoll;
         }
 
         #endregion
+
+        private static void ThrowIfInvalidPlayer(int playerId)
+        {
+            if (!GameState.IsValidPlayer(playerId))
+                throw new ArgumentOutOfRangeException(nameof(playerId), playerId,
+                    $"Player id must be in the range 0..{GameState.PlayerCount - 1}.");
+        }
     }
 }
