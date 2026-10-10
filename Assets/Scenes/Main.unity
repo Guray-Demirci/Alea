@@ -225,8 +225,8 @@ MonoBehaviour:
       Code: PA
     - ItemId: checker_timebender
       Code: TB
-    - ItemId: checker_bouncer
-      Code: BO
+    - ItemId: checker_clover
+      Code: CL
     - ItemId: checker_doubledown
       Code: DD
     - ItemId: checker_catalyst
@@ -237,16 +237,40 @@ MonoBehaviour:
       Code: SI
     - ItemId: checker_sacrificial
       Code: SA
-    - ItemId: checker_greedy
-      Code: GR
-    - ItemId: checker_tax
-      Code: TX
+    - ItemId: checker_golden
+      Code: GO
+    - ItemId: checker_bandit
+      Code: BA
     - ItemId: checker_anchor
       Code: AN
     - ItemId: checker_phoenix
       Code: PH
     - ItemId: checker_doomsday
       Code: DM
+    - ItemId: checker_drunken
+      Code: DR
+    - ItemId: checker_gunpowder
+      Code: GP
+    - ItemId: checker_voodoo
+      Code: VO
+    - ItemId: checker_reckless
+      Code: RE
+    - ItemId: checker_teleporter
+      Code: TP
+    - ItemId: checker_secondchance
+      Code: SC
+    - ItemId: checker_grappling
+      Code: GR
+    - ItemId: checker_poisonedrum
+      Code: PR
+    - ItemId: checker_diceholder
+      Code: DH
+    - ItemId: checker_kraken
+      Code: KR
+    - ItemId: checker_mutiny
+      Code: MU
+    - ItemId: checker_hammer
+      Code: HA
   _targetScore: 0
   _turnLimit: 30
   _finalStretchTurns: 3
