@@ -45,15 +45,20 @@ Key rules of the design:
 - **The shop opens between matches.** After every won match of a run `RunState.OpenShop` stocks three
   special checkers, a plain checker, a card and a charm from the run asset's shop section; checkers join the
   deck, cards and charms join the run's relics (dice relics only bend their owner's dice). `ShopView` draws
-  `ingameshop.png` (exported from `ingameshop_scheme.aseprite`) and `ShopPresenter` connects it to Core.
+  the Merchant Table from `Assets/Data/ShopArt.asset` (sprites in `Assets/Sprites/Shop`, cut from
+  `in_game_shop_ready.aseprite`) and `ShopPresenter` connects it to Core. The table has no place for the
+  card and charm shelves yet, so Core stocks them but the screen does not show them.
 - **The board is layered art.** `BoardManager` stacks full-canvas (320x180) sprites: `background.png`,
   `board.png` and `points.png`, the 24 triangles. While a checker is dragged, every legal point shows
   `point_highlight.png` around itself, mirrored on the bottom row. Both point sprites are exported from
   `points_scheme.aseprite`, whose columns match `BoardLayout` pixel by pixel.
 - **Checkers are drawn from a skin per side** (`CheckerSkin`): the player's `player_checker.png`, with a ring
   while it can move with the rolled dice (`player_checker_movable.png`) and another while it is picked up
-  (`player_checker_selected.png`); the opponent's `opponent_checker.png`. Which checker can move is Core's
-  answer (`GameState.GetMovableChecker`, the same rule `HasAnyLegalMove` uses); the View only paints it.
+  (`player_checker_selected.png`); the opponent's `opponent_checker.png`. The player's special checkers wear
+  their own art from `Assets/Data/CheckerArt.asset` (`Assets/Sprites/Checkers/Tier N`, the artist's file
+  names kept so re-exports overwrite them), with a shared ring for the movable and picked-up states. Which
+  checker can move is Core's answer (`GameState.GetMovableChecker`, the same rule `HasAnyLegalMove` uses);
+  the View only paints it.
 - **The info panel is built in code too.** `HudView` draws `general_info.png` (exported from
   `general_info_scheme.aseprite`) and writes the values `HudPresenter` gives it into text boxes measured
   pixel by pixel from the art, as the shop does. If a strip moves in the art, update its box in the Inspector.

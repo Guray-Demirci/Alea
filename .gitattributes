@@ -1,9 +1,9 @@
 # Normalize line endings: text files are stored with LF in the repository.
 * text=auto
 
-# Source and config
-*.cs        text diff=csharp
-*.asmdef    text
+# Source and config. C# files and assembly definitions stay LF in the working tree too, as .editorconfig asks.
+*.cs        text eol=lf diff=csharp
+*.asmdef    text eol=lf
 *.json      text
 *.md        text
 *.shader    text
