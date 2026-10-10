@@ -1110,6 +1110,62 @@ namespace Tavla.Core.Tests
             Assert.IsNotNull(_state.Nodes[3].GetMark(0));
         }
 
+        [Test]
+        public void BanditChecker_EarnsAGoldForEveryEnemyThatPassesOverIt()
+        {
+            TestBoard.Place(_state, 5, new BanditChecker(1));
+            TestBoard.PlaceDefault(_state, 2, 0);
+            TestBoard.PlaceDefault(_state, 3, 0);
+            TestBoard.SetDice(_context, 6, 4);
+
+            Assert.IsTrue(_state.TryMove(2, 8));
+            Assert.IsTrue(_state.TryMove(3, 7));
+
+            Assert.AreEqual(2, _context.GetGold(1));
+        }
+
+        [Test]
+        public void BanditChecker_TakesNothingFromItsOwnSide()
+        {
+            TestBoard.Place(_state, 5, new BanditChecker(0));
+            TestBoard.PlaceDefault(_state, 2, 0);
+            TestBoard.SetDice(_context, 6, 4);
+
+            Assert.IsTrue(_state.TryMove(2, 8));
+
+            Assert.AreEqual(0, _context.GetGold(0));
+        }
+
+        [Test]
+        public void TimeBenderChecker_OnALuckyRoll_SkipsTheOpponentsNextTurn()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(new LuckyRandom(), out context);
+            TestBoard.Place(state, 0, new TimeBenderChecker(0));
+            TestBoard.PlaceDefault(state, 20, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            Assert.IsTrue(state.TryMove(0, 3));
+            state.EndTurn();
+            Assert.AreEqual(0, state.CurrentPlayerId, "Player 1's turn was skipped.");
+
+            state.EndTurn();
+            Assert.AreEqual(1, state.CurrentPlayerId, "Only one turn is skipped.");
+        }
+
+        [Test]
+        public void TimeBenderChecker_OnAnUnluckyRoll_LeavesTheTurnOrderAlone()
+        {
+            TestBoard.Place(_state, 0, new TimeBenderChecker(0));
+            TestBoard.PlaceDefault(_state, 20, 1);
+            TestBoard.SetDice(_context, 3, 5);
+
+            Assert.IsTrue(_state.TryMove(0, 3));
+            _state.EndTurn();
+
+            Assert.AreEqual(1, _state.CurrentPlayerId);
+        }
+
         private List<int> GetLegalTargets(BaseChecker checker)
         {
             List<int> targets = new List<int>();

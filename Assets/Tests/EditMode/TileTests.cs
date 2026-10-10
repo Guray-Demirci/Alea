@@ -75,6 +75,26 @@ namespace Tavla.Core.Tests
         }
 
         [Test]
+        public void PlunderCove_TakesBackTheTurnsScoreOfThePlayerStandingOnIt()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(3, new PlunderCoveTile());
+            TestBoard.PlaceDefault(state, 3, 0);
+            TestBoard.PlaceDefault(state, 20, 1);
+
+            context.AddScore(0, 10); // An earlier turn's score is safe.
+            context.RollDice(0);     // This turn begins.
+            context.AddScore(0, 30);
+            context.AddScore(1, 20); // Player 1 has no checker on the cove.
+
+            state.EndTurn();
+
+            Assert.AreEqual(10, context.GetScore(0));
+            Assert.AreEqual(20, context.GetScore(1));
+        }
+
+        [Test]
         public void Swamp_OnTheTurnTheCheckerSank_ItCanNeitherLeaveNorBeFreed()
         {
             MatchContext context;
