@@ -12,7 +12,6 @@ using UnityEngine.InputSystem;
 using Tavla.Core.AI;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
-using Tavla.Core.Interfaces;
 using Tavla.Core.Run;
 using Tavla.Core.Runtime;
 
@@ -23,9 +22,10 @@ namespace Tavla.View
     ///
     /// Responsibilities:
     ///   1) boot Core: a run (RunState hands out one match after another) or a single sandbox match,
-    ///   2) build the scene (24 points + bear-off area) once, and the checkers of every match,
+    ///   2) build the scene once (through <see cref="BoardSceneBuilder"/>) and the checkers of every match,
     ///   3) forward requests from CheckerController to TryMove,
-    ///   4) refresh the visuals when Core raises events.
+    ///   4) refresh the visuals when Core raises events; writing them to the console is
+    ///      <see cref="BoardEventLog"/>'s job.
     ///
     /// KEY DESIGN: checker positions are NOT computed from move data. After every event
     /// RefreshBoard() re-reads the board from the model's current state. That is why the Doomsday
@@ -164,6 +164,9 @@ namespace Tavla.View
         private TavlaBot _bot;
         private Coroutine _botRoutine;
         private Coroutine _autoEndRoutine;
+
+        // Writes the match's events to the console; the listeners below only act on what changes the screen.
+        private readonly BoardEventLog _eventLog = new BoardEventLog();
 
         // Core object -> scene representative. This dictionary is the View's only link to the model.
         private readonly Dictionary<BaseChecker, CheckerController> _checkerViews =
@@ -490,28 +493,29 @@ namespace Tavla.View
         private void BuildScene()
         {
             if (_configureCamera)
-                ConfigureCamera();
+                BoardSceneBuilder.ConfigureCamera(_layout, _cameraBackgroundColor);
 
             if (_backgroundSprite != null)
-                SpawnCanvasLayer("ScreenBackground", _backgroundSprite, SortingOrders.ScreenBackground);
+                BoardSceneBuilder.SpawnCanvasLayer("ScreenBackground", _backgroundSprite, SortingOrders.ScreenBackground);
 
             if (_boardSprite != null)
-                SpawnCanvasLayer("BoardBackground", _boardSprite, SortingOrders.BoardBackground);
+                BoardSceneBuilder.SpawnCanvasLayer("BoardBackground", _boardSprite, SortingOrders.BoardBackground);
 
             if (_pointsSprite != null)
-                SpawnCanvasLayer("Points", _pointsSprite, SortingOrders.BoardPoints);
+                BoardSceneBuilder.SpawnCanvasLayer("Points", _pointsSprite, SortingOrders.BoardPoints);
 
-            _solidSprite = CreateSolidSprite();
+            _solidSprite = BoardSceneBuilder.CreateSolidSprite();
 
             Sprite markSprite = _markSprite;
             if (markSprite == null)
-                markSprite = _builtInMarkSprite = CreateFootprintSprite(_layout.PixelsPerUnit);
+                markSprite = _builtInMarkSprite = BoardSceneBuilder.CreateFootprintSprite(_layout.PixelsPerUnit);
 
-            SpawnNodes(_solidSprite, markSprite);
-            SpawnBearOffTarget(_solidSprite);
+            _nodeViews.AddRange(BoardSceneBuilder.SpawnNodes(_layout, _nodePrefab, _pointHighlightSprite, _solidSprite,
+                                                             markSprite, _markColor));
+            _bearOffView = BoardSceneBuilder.SpawnBearOffTarget(_layout, _solidSprite, _bearOffTrayColor);
 
             // The checkers belong to a match; BeginMatch spawns them.
-            _checkerRoot = CreateWorldRoot("Checkers");
+            _checkerRoot = BoardSceneBuilder.CreateWorldRoot("Checkers");
 
             if (_shopArt != null)
                 BuildShop();
@@ -553,187 +557,6 @@ namespace Tavla.View
                 return;
 
             _hud.Bind(_gameState, _context);
-        }
-
-        /// <summary>
-        /// Configures the camera for the board. Creates one if the scene has no camera at all —
-        /// a safety net against the "Display 1: No cameras rendering" error.
-        /// </summary>
-        private void ConfigureCamera()
-        {
-            Camera cam = Camera.main;
-
-            if (cam == null)
-                cam = FindAnyObjectByType<Camera>();
-
-            if (cam == null)
-            {
-                GameObject go = new GameObject("Main Camera");
-                go.tag = "MainCamera";
-                cam = go.AddComponent<Camera>();
-                GameLog.Info("[View] The scene had no camera; one was created.", this);
-            }
-
-            cam.orthographic = true;
-            cam.orthographicSize = _layout.CameraOrthographicSize;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = _cameraBackgroundColor;
-            cam.transform.position = new Vector3(0f, 0f, -10f);
-            cam.transform.rotation = Quaternion.identity;
-        }
-
-        /// <summary>
-        /// All generated visuals live at the SCENE ROOT, at the world origin.
-        /// They are not tied to the position/scale of the GameManager object — required because
-        /// "Create Empty" places objects where the Scene view is looking, not at (0,0,0);
-        /// otherwise the board background would drift away from the checkers.
-        /// </summary>
-        private static Transform CreateWorldRoot(string name)
-        {
-            GameObject go = new GameObject(name);
-            go.transform.position = Vector3.zero;
-            go.transform.rotation = Quaternion.identity;
-            go.transform.localScale = Vector3.one;
-            return go.transform;
-        }
-
-        /// <summary>
-        /// Places a full-canvas artwork (background, board, points). They all share the canvas size (320x180)
-        /// and PPU, so placed at the origin each exactly fills what the camera sees; only the sorting order
-        /// stacks them.
-        /// </summary>
-        private static void SpawnCanvasLayer(string name, Sprite sprite, int sortingOrder)
-        {
-            Transform layer = CreateWorldRoot(name);
-
-            SpriteRenderer spriteRenderer = layer.gameObject.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = sprite;
-            spriteRenderer.sortingOrder = sortingOrder;
-        }
-
-        /// <summary>
-        /// Builds the 24 points from the geometry. No need to place 24 objects by hand.
-        /// The highlight is the outline artwork if assigned, otherwise <paramref name="solid"/> as a fill.
-        /// Every point also gets its (hidden) score mark, <paramref name="mark"/>.
-        /// </summary>
-        private void SpawnNodes(Sprite solid, Sprite mark)
-        {
-            Transform root = CreateWorldRoot("Nodes");
-
-            Vector2 size = _layout.GetNodeSize();
-
-            for (int i = 0; i < GameState.NodeCount; i++)
-            {
-                NodeView view;
-
-                if (_nodePrefab != null)
-                {
-                    view = Instantiate(_nodePrefab, root);
-                }
-                else
-                {
-                    GameObject go = new GameObject("Node");
-                    go.transform.SetParent(root, false);
-                    go.AddComponent<BoxCollider2D>();
-                    view = go.AddComponent<NodeView>();
-                }
-
-                view.Initialize(i, _layout.GetNodeCenter(i), size);
-
-                // The artwork is drawn for the top row (base up); the bottom row points the other way.
-                if (_pointHighlightSprite != null)
-                    view.BuildArtworkHighlight(_pointHighlightSprite, !_layout.IsTopRow(i));
-                else
-                    view.BuildFillHighlight(solid, size);
-
-                view.BuildMark(mark, _markColor, _layout.GetMarkPosition(i));
-
-                _nodeViews.Add(view);
-            }
-        }
-
-        /// <summary>
-        /// Bear-off drop target. Mechanically an ordinary NodeView — the only difference is that its index is
-        /// <see cref="GameState.BearOffIndex"/>. CheckerController therefore sends RequestMove(checker, BearOffIndex)
-        /// without knowing anything, and TryMove already interprets it as a bear-off. The point prefab is
-        /// deliberately not used: its highlight is sized for a triangle and would not fit this strip.
-        /// </summary>
-        private void SpawnBearOffTarget(Sprite solid)
-        {
-            Transform root = CreateWorldRoot("BearOff");
-            Vector2 size = _layout.GetBearOffSize();
-
-            GameObject go = new GameObject("BearOffTray");
-            go.transform.SetParent(root, false);
-            go.AddComponent<BoxCollider2D>();
-
-            _bearOffView = go.AddComponent<NodeView>();
-            _bearOffView.Initialize(GameState.BearOffIndex, _layout.GetBearOffCenter(), size);
-            _bearOffView.BuildFillHighlight(solid, size);
-            go.name = "BearOffTray"; // Initialize renames it to "Node_-02".
-
-            GameObject tray = new GameObject("Tray");
-            tray.transform.SetParent(go.transform, false);
-            tray.transform.localScale = new Vector3(size.x, size.y, 1f);
-
-            SpriteRenderer spriteRenderer = tray.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = solid;
-            spriteRenderer.color = _bearOffTrayColor;
-            spriteRenderer.sortingOrder = SortingOrders.BearOffTray;
-        }
-
-        /// <summary>1x1 white sprite for highlights — generated in code so no asset is required.</summary>
-        private static Sprite CreateSolidSprite()
-        {
-            Texture2D texture = new Texture2D(1, 1);
-            texture.name = "SolidWhite";
-            texture.filterMode = FilterMode.Point;
-            texture.SetPixel(0, 0, Color.white);
-            texture.Apply();
-
-            // pixelsPerUnit = 1 -> the sprite is exactly 1 world unit and is sized via scale.
-            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
-            sprite.name = "SolidWhite";
-            return sprite;
-        }
-
-        /// <summary>
-        /// The built-in score mark: a pair of footprints, one texel per canvas pixel, white so the tint colours it.
-        /// Width and height are even, so the centred pivot lands on a pixel edge and the mark stays pixel-exact.
-        /// </summary>
-        private static Sprite CreateFootprintSprite(float pixelsPerUnit)
-        {
-            string[] rows =
-            {
-                "......XX",
-                ".....XXX",
-                ".....XXX",
-                "XX...XX.",
-                "XXX...X.",
-                "XXX.....",
-                ".XX.....",
-                ".X......"
-            };
-
-            int width = rows[0].Length;
-            int height = rows.Length;
-
-            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            texture.name = "Footprints";
-            texture.filterMode = FilterMode.Point;
-            texture.wrapMode = TextureWrapMode.Clamp;
-
-            // Texture rows run bottom-up; the pattern above is written top-down.
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                    texture.SetPixel(x, height - 1 - y, rows[y][x] == 'X' ? Color.white : Color.clear);
-            }
-            texture.Apply();
-
-            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
-            sprite.name = "Footprints";
-            return sprite;
         }
 
         private void SpawnCheckers()
@@ -803,25 +626,19 @@ namespace Tavla.View
 
         private void Subscribe()
         {
+            // First, so the log reads in the order things happen (see BoardEventLog).
+            _eventLog.Attach(_gameState, _context);
+
             _gameState.MoveExecuted += HandleMoveExecuted;
             _gameState.MoveRejected += HandleMoveRejected;
-            _gameState.CheckerCaptured += HandleCheckerCaptured;
             _gameState.CheckerDestroyed += HandleCheckerDestroyed;
             _gameState.CheckerAdded += HandleCheckerAdded;
-            _gameState.CheckerTeleported += HandleCheckerTeleported;
             _gameState.CheckerReleased += HandleCheckerReleased;
             _gameState.CheckerSacrificed += HandleCheckerSacrificed;
-            _gameState.TileTriggered += HandleTileTriggered;
-            _gameState.AbilityTriggered += HandleAbilityTriggered;
             _gameState.TurnChanged += HandleTurnChanged;
-            _gameState.TurnCountChanged += HandleTurnCountChanged;
-            _gameState.CheckerBorneOff += HandleCheckerBorneOff;
-            _gameState.FinalStretchStarted += HandleFinalStretchStarted;
             _gameState.MatchEnded += HandleMatchEnded;
 
             _context.DiceRolled += HandleDiceRolled;
-            _context.ScoreChanged += HandleScoreChanged;
-            _context.GoldChanged += HandleGoldChanged;
         }
 
         private void OnEnable()
@@ -881,31 +698,22 @@ namespace Tavla.View
         /// <summary>Disconnects from the current match. Safe to call more than once.</summary>
         private void Unsubscribe()
         {
+            _eventLog.Detach();
+
             if (_gameState != null)
             {
                 _gameState.MoveExecuted -= HandleMoveExecuted;
                 _gameState.MoveRejected -= HandleMoveRejected;
-                _gameState.CheckerCaptured -= HandleCheckerCaptured;
                 _gameState.CheckerDestroyed -= HandleCheckerDestroyed;
                 _gameState.CheckerAdded -= HandleCheckerAdded;
-                _gameState.CheckerTeleported -= HandleCheckerTeleported;
                 _gameState.CheckerReleased -= HandleCheckerReleased;
                 _gameState.CheckerSacrificed -= HandleCheckerSacrificed;
-                _gameState.TileTriggered -= HandleTileTriggered;
-                _gameState.AbilityTriggered -= HandleAbilityTriggered;
                 _gameState.TurnChanged -= HandleTurnChanged;
-                _gameState.TurnCountChanged -= HandleTurnCountChanged;
-                _gameState.CheckerBorneOff -= HandleCheckerBorneOff;
-                _gameState.FinalStretchStarted -= HandleFinalStretchStarted;
                 _gameState.MatchEnded -= HandleMatchEnded;
             }
 
             if (_context != null)
-            {
                 _context.DiceRolled -= HandleDiceRolled;
-                _context.ScoreChanged -= HandleScoreChanged;
-                _context.GoldChanged -= HandleGoldChanged;
-            }
         }
 
         #endregion
@@ -1089,42 +897,14 @@ namespace Tavla.View
 
         private void HandleMoveExecuted(MoveResult result)
         {
-            string suffix = result.WasInfiltration ? " [infiltration]" : string.Empty;
-            string to = result.WasBearOff ? "bear-off" : result.ToIndex.ToString();
-            GameLog.Info($"[View] Move: {result.FromIndex} -> {to} " +
-                         $"(player {result.PlayerId}, captured: {result.CapturedCheckers.Count}){suffix}");
-
             RefreshBoard();
             ScheduleAutoEndCheck();
         }
 
         private void HandleMoveRejected(MoveResult result)
         {
-            GameLog.Info($"[View] Move rejected: {result.Error}");
-
             // Snaps a checker left hanging after a drag back into place. No separate "bounce back" code needed.
             RefreshBoard();
-        }
-
-        private void HandleCheckerCaptured(BaseChecker checker, int nodeIndex, CaptureDestination destination)
-        {
-            switch (destination)
-            {
-                case CaptureDestination.HomeEntry:
-                    GameLog.Info($"[View] {checker.TypeId} rose from the ashes and returned to its starting point.");
-                    break;
-                case CaptureDestination.Destroyed:
-                    GameLog.Info($"[View] {checker.TypeId} sacrificed itself.");
-                    break;
-                case CaptureDestination.Converted:
-                    GameLog.Info($"[View] {checker.TypeId} mutinied and changed sides (point {nodeIndex}).");
-                    break;
-                default:
-                    GameLog.Info($"[View] {checker.TypeId} was hit and sent to the bar (point {nodeIndex}).");
-                    break;
-            }
-
-            // TODO: play the capture VFX here. Positioning is RefreshBoard's job.
         }
 
         private void HandleCheckerDestroyed(BaseChecker checker, int nodeIndex)
@@ -1135,8 +915,6 @@ namespace Tavla.View
                 _checkerViews.Remove(checker);
                 Destroy(view.gameObject);
             }
-
-            GameLog.Info($"[View] {checker.TypeId} was removed from the game (point {nodeIndex}).");
         }
 
         /// <summary>
@@ -1155,69 +933,28 @@ namespace Tavla.View
                     PlaceChecker(checker, _layout.GetCheckerPosition(nodeIndex, k, node.CheckerCount),
                                  SortingOrders.CheckerBase + k, true);
             }
-
-            GameLog.Info($"[View] {checker.TypeId} joined player {checker.OwnerId} (point {nodeIndex}).");
         }
 
         private void HandleCheckerSacrificed(BaseChecker checker, int nodeIndex)
         {
-            GameLog.Info($"[View] {checker.TypeId} was sacrificed on point {nodeIndex} for its ability.");
-
             // The checker is gone and the dice may have grown: snap the dragged visual back and re-check the turn.
             RefreshBoard();
             ScheduleAutoEndCheck();
         }
 
-        private void HandleCheckerTeleported(BaseChecker checker, int fromIndex, int toIndex)
-        {
-            GameLog.Info($"[View] {checker.TypeId} was caught by the maelstrom: {fromIndex} -> {toIndex}");
-        }
-
         private void HandleCheckerReleased(BaseChecker checker, int nodeIndex)
         {
-            GameLog.Info($"[View] {checker.TypeId} was freed on point {nodeIndex} by sacrificing a die.");
-
             // The checker did not move, but a die was spent: snap the dragged visual back and re-check the turn.
             RefreshBoard();
             ScheduleAutoEndCheck();
         }
 
-        private void HandleTileTriggered(ITileEffect tile, int nodeIndex, BaseChecker checker)
-        {
-            GameLog.Info($"[View] Tile triggered: {tile.EffectId} (point {nodeIndex})");
-        }
-
-        /// <summary>
-        /// ONE event, 30 different VFX. When a new special checker is added BoardManager does not change —
-        /// only a new abilityId -> ParticleSystem entry is added to a lookup.
-        /// </summary>
-        private void HandleAbilityTriggered(string abilityId, BaseChecker checker, int nodeIndex)
-        {
-            GameLog.Info($"[View] Ability: {abilityId} (point {nodeIndex})");
-        }
-
         private void HandleTurnChanged(int playerId)
         {
-            GameLog.Info($"[View] Turn: player {playerId}");
             _context.RollDice(playerId);
 
             // Wake the bot AFTER the dice are rolled — it cannot think before its hand is known.
             TryStartBotTurn(playerId);
-        }
-
-        private void HandleTurnCountChanged(int remaining)
-        {
-            GameLog.Info($"[View] Turns remaining: {remaining}");
-        }
-
-        private void HandleCheckerBorneOff(BaseChecker checker, int nodeIndex)
-        {
-            GameLog.Info($"[View] Checker borne off: {checker.TypeId} (point {nodeIndex})");
-        }
-
-        private void HandleFinalStretchStarted(int remaining)
-        {
-            GameLog.Info($"[View] The opponent is out of checkers — final stretch, {remaining} turns left.");
         }
 
         private void HandleMatchEnded(int winnerId)
@@ -1225,12 +962,6 @@ namespace Tavla.View
             StopBotTurn();
             CancelAutoEnd();
             RefreshMovableCheckers();
-
-            string message = winnerId == GameState.NoWinner
-                ? "The match ended in a draw."
-                : $"Match over — winner: player {winnerId}";
-
-            GameLog.Info($"[View] {message} (P0: {_context.GetScore(0)} — P1: {_context.GetScore(1)})");
         }
 
         #endregion
@@ -1349,8 +1080,6 @@ namespace Tavla.View
 
         private void HandleDiceRolled(DiceRoll roll)
         {
-            GameLog.Info($"[View] Dice: {roll.First}-{roll.Second}" + (roll.IsDouble ? " (double!)" : string.Empty));
-
             // A roll can move checkers by itself (a Kraken waking on a double), and new dice give a new answer:
             // the turn's checkers light up (or, on the bot's turn, go dark). RefreshBoard does both.
             RefreshBoard();
@@ -1359,10 +1088,6 @@ namespace Tavla.View
             // from anywhere else (the sandbox re-rolling a turn) get the same auto-pass.
             ScheduleAutoEndCheck();
         }
-
-        private void HandleScoreChanged(int playerId, int score) => GameLog.Info($"[View] Score P{playerId}: {score}");
-
-        private void HandleGoldChanged(int playerId, int gold) => GameLog.Info($"[View] Gold P{playerId}: {gold}");
 
         #endregion
     }
