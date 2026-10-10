@@ -41,8 +41,6 @@ namespace Tavla.Core.Runtime
 
         public int GetScore(int playerId) => 0;
 
-        public void AddScoreMultiplier(int playerId, float multiplier, bool permanent) { }
-
         public void ResetTurnScore(int playerId) { }
 
         public void AddGold(int playerId, int amount) { }
@@ -54,5 +52,11 @@ namespace Tavla.Core.Runtime
         public void SkipTurn(int playerId) { }
 
         public void PinNextDie(int playerId, int value) { }
+
+        public void RestrictNextRollToOneDie(int playerId) { }
+
+        public void RerollRemainingDice(int playerId) { }
+
+        public void GrantExtraDie(int playerId) { }
     }
 }

@@ -17,10 +17,14 @@ namespace Tavla.View
 
         [Header("Visual feedback (optional)")]
         [SerializeField] private SpriteRenderer _highlight;
+        [Tooltip("Tint of a fill highlight (and of a highlight assigned here). Artwork highlights keep their own colours.")]
         [FormerlySerializedAs("_hoverColor")]
         [SerializeField] private Color _highlightColor = new Color(1f, 1f, 1f, 0.25f);
 
         private BoxCollider2D _collider;
+
+        // Shown while the point carries the human player's score mark (Navigator footprints).
+        private SpriteRenderer _mark;
 
         /// <summary>Index in Core's GameState.Nodes array (0-23), or GameState.BearOffIndex for the tray.</summary>
         public int NodeIndex => _nodeIndex;
@@ -33,11 +37,15 @@ namespace Tavla.View
             // only the overlap query "was it dropped here?" is needed.
             _collider.isTrigger = true;
 
+            // A highlight assigned in a prefab takes the tint; one built later chooses its own colour.
+            if (_highlight != null)
+                _highlight.color = _highlightColor;
+
             SetHighlight(false);
         }
 
         /// <summary>Called by BoardManager while building the scene.</summary>
-        public void Initialize(int nodeIndex, Vector3 worldPosition, Vector2 size, Sprite highlightSprite = null)
+        public void Initialize(int nodeIndex, Vector3 worldPosition, Vector2 size)
         {
             _nodeIndex = nodeIndex;
             transform.position = worldPosition;
@@ -51,27 +59,49 @@ namespace Tavla.View
 
             gameObject.name = $"Node_{nodeIndex:00}";
 
-            if (_highlight == null && highlightSprite != null)
-                BuildHighlight(highlightSprite, size);
-
             SetHighlight(false);
         }
 
         /// <summary>
-        /// Builds the highlight visual in code. The sprite is 1 world unit in size,
-        /// so its scale is set directly to the point size.
+        /// Highlight drawn from pixel artwork at its own size, centred on the point, in its own colours.
+        /// <paramref name="flipY"/> mirrors it, so the bottom row reuses the top row's artwork.
+        /// Does nothing if a highlight is already assigned (prefab).
         /// </summary>
-        private void BuildHighlight(Sprite sprite, Vector2 size)
+        public void BuildArtworkHighlight(Sprite artwork, bool flipY)
+        {
+            if (_highlight != null)
+                return;
+
+            _highlight = CreateHighlightRenderer(artwork, Vector2.one, Color.white);
+            _highlight.flipY = flipY;
+            SetHighlight(false);
+        }
+
+        /// <summary>
+        /// Highlight drawn from a solid sprite of 1 world unit, stretched over the whole drop area and tinted
+        /// with the highlight colour — for targets without artwork. Does nothing if a highlight is already assigned.
+        /// </summary>
+        public void BuildFillHighlight(Sprite solid, Vector2 size)
+        {
+            if (_highlight != null)
+                return;
+
+            _highlight = CreateHighlightRenderer(solid, size, _highlightColor);
+            SetHighlight(false);
+        }
+
+        private SpriteRenderer CreateHighlightRenderer(Sprite sprite, Vector2 scale, Color color)
         {
             GameObject go = new GameObject("Highlight");
             go.transform.SetParent(transform, false);
             go.transform.localPosition = Vector3.zero;
-            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            go.transform.localScale = new Vector3(scale.x, scale.y, 1f);
 
-            _highlight = go.AddComponent<SpriteRenderer>();
-            _highlight.sprite = sprite;
-            _highlight.color = _highlightColor;
-            _highlight.sortingOrder = SortingOrders.NodeHighlight;
+            SpriteRenderer highlight = go.AddComponent<SpriteRenderer>();
+            highlight.sprite = sprite;
+            highlight.color = color;
+            highlight.sortingOrder = SortingOrders.NodeHighlight;
+            return highlight;
         }
 
         /// <summary>Highlights this point as a legal destination while dragging. Visual only.</summary>
@@ -81,7 +111,35 @@ namespace Tavla.View
                 return;
 
             _highlight.enabled = active;
-            _highlight.color = _highlightColor;
+        }
+
+        /// <summary>
+        /// The point's score mark (Navigator footprints): <paramref name="sprite"/> in the given tint at
+        /// <paramref name="worldPosition"/>, hidden until <see cref="SetMarked"/> shows it. Does nothing if already built.
+        /// </summary>
+        public void BuildMark(Sprite sprite, Color color, Vector3 worldPosition)
+        {
+            if (_mark != null || sprite == null)
+                return;
+
+            GameObject go = new GameObject("Mark");
+            go.transform.SetParent(transform, false);
+            go.transform.position = worldPosition;
+
+            _mark = go.AddComponent<SpriteRenderer>();
+            _mark.sprite = sprite;
+            _mark.color = color;
+            _mark.sortingOrder = SortingOrders.PointMark;
+            _mark.enabled = false;
+        }
+
+        /// <summary>Shows or hides the point's score mark. Visual only — whether it is marked is Core's answer.</summary>
+        public void SetMarked(bool marked)
+        {
+            if (_mark == null)
+                return;
+
+            _mark.enabled = marked;
         }
 
         // Shows the point bounds in the editor.

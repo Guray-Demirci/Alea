@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using Tavla.Core.Board;
 using Tavla.Core.Runtime;
@@ -16,25 +17,13 @@ namespace Tavla.Core.Tests
         }
 
         [Test]
-        public void AddScore_AppliesMultipliersAndRounds()
+        public void AddScore_AddsToTheTotalAndReturnsTheAmountWritten()
         {
-            _context.AddScoreMultiplier(0, 1.5f, false);
-            _context.AddScoreMultiplier(0, 1.5f, true);
+            Assert.AreEqual(10, _context.AddScore(0, 10));
+            Assert.AreEqual(5, _context.AddScore(0, 5));
 
-            // 10 x 2.25 = 22.5 -> rounded away from zero.
-            Assert.AreEqual(23, _context.AddScore(0, 10));
-            Assert.AreEqual(23, _context.GetScore(0));
-        }
-
-        [Test]
-        public void RollDice_ResetsTheTurnMultiplierButKeepsThePermanentOne()
-        {
-            _context.AddScoreMultiplier(0, 2f, false);
-            _context.AddScoreMultiplier(0, 3f, true);
-
-            _context.RollDice(0);
-
-            Assert.AreEqual(30, _context.AddScore(0, 10));
+            Assert.AreEqual(15, _context.GetScore(0));
+            Assert.AreEqual(0, _context.GetScore(1), "The other player's score is untouched.");
         }
 
         [Test]
@@ -66,6 +55,60 @@ namespace Tavla.Core.Tests
 
             Assert.AreEqual(4, _context.RollDice(0).First);
             Assert.AreEqual(1, _context.RollDice(0).First, "FixedRandom rolls 1 once the pin is used up.");
+        }
+
+        [Test]
+        public void LoadedDice_SettleEveryRollOfTheirPlayerUntilUnloaded()
+        {
+            LoadedDice dice = new LoadedDice();
+            dice.Load(6, 3);
+            _context.RegisterDiceModifier(0, dice);
+
+            for (int i = 0; i < 2; i++)
+            {
+                DiceRoll roll = _context.RollDice(0);
+                Assert.AreEqual(6, roll.First);
+                Assert.AreEqual(3, roll.Second);
+            }
+
+            Assert.AreEqual(1, _context.RollDice(1).First, "The other player's dice are not loaded.");
+
+            dice.Unload();
+            Assert.AreEqual(1, _context.RollDice(0).First, "FixedRandom rolls 1 once the dice are unloaded.");
+        }
+
+        [Test]
+        public void LoadedDice_OnADouble_GrantFourMoves()
+        {
+            LoadedDice dice = new LoadedDice();
+            dice.Load(5, 5);
+            _context.RegisterDiceModifier(0, dice);
+
+            Assert.AreEqual(4, _context.RollDice(0).RemainingMoves.Count);
+        }
+
+        [Test]
+        public void LoadedDice_ThePinnedDieStillApplies()
+        {
+            LoadedDice dice = new LoadedDice();
+            dice.Load(6, 6);
+            _context.RegisterDiceModifier(0, dice);
+            _context.PinNextDie(0, 2);
+
+            DiceRoll roll = _context.RollDice(0);
+
+            Assert.AreEqual(2, roll.First, "The Anchor's pin settles a die after the relics, loaded dice included.");
+            Assert.AreEqual(6, roll.Second);
+        }
+
+        [Test]
+        public void LoadedDice_RejectFacesOffTheDie()
+        {
+            LoadedDice dice = new LoadedDice();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => dice.Load(0, 3));
+            Assert.Throws<ArgumentOutOfRangeException>(() => dice.Load(2, GameState.MaxDieValue + 1));
+            Assert.IsFalse(dice.IsLoaded);
         }
 
         [Test]

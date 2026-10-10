@@ -8,6 +8,7 @@ namespace Tavla.Core.Tiles
     /// <summary>
     /// Maelstrom Tile. "A checker that lands here is caught by the current and flung to a random point.
     /// If the opponent holds that point, the checker is captured and sent to the bar."
+    /// A full point (<see cref="GameState.StackLimit"/>) is skipped: the checker goes on to the next point.
     /// </summary>
     public class MaelstromTile : BaseTileEffect
     {
@@ -29,7 +30,10 @@ namespace Tavla.Core.Tiles
             _resolving = true;
             try
             {
-                int destination = PickDestination(context, node.Index);
+                int destination = PickDestination(context, node.Index, checker.OwnerId);
+                if (destination == GameState.InvalidIndex)
+                    return;
+
                 context.Board.ReportAbility(AbilityIds.MaelstromPull, checker, node.Index);
                 context.Board.TeleportChecker(checker, node.Index, destination);
 
@@ -44,8 +48,12 @@ namespace Tavla.Core.Tiles
             }
         }
 
-        /// <summary>Picks a random point other than the maelstrom's own point.</summary>
-        private static int PickDestination(IMatchContext context, int currentIndex)
+        /// <summary>
+        /// Picks a random point other than the maelstrom's own point. A full point (<see cref="GameState.StackLimit"/>)
+        /// passes the checker on to the next one in its own direction, wrapping around the board.
+        /// </summary>
+        /// <returns>The destination, or <see cref="GameState.InvalidIndex"/> if every other point is full.</returns>
+        private static int PickDestination(IMatchContext context, int currentIndex, int playerId)
         {
             int destination = context.Random.Range(0, GameState.NodeCount - 1);
 
@@ -53,7 +61,17 @@ namespace Tavla.Core.Tiles
             if (destination >= currentIndex)
                 destination++;
 
-            return destination;
+            int direction = GameState.GetDirection(playerId);
+            for (int step = 0; step < GameState.NodeCount; step++)
+            {
+                if (destination != currentIndex &&
+                    context.Board.Nodes[destination].CheckerCount < GameState.StackLimit)
+                    return destination;
+
+                destination = (destination + direction + GameState.NodeCount) % GameState.NodeCount;
+            }
+
+            return GameState.InvalidIndex;
         }
     }
 }

@@ -1,5 +1,4 @@
 using Tavla.Core.Abilities;
-using Tavla.Core.Interfaces;
 
 namespace Tavla.Core.Checkers
 {
@@ -10,11 +9,9 @@ namespace Tavla.Core.Checkers
     /// (<see cref="IBlockadeOverride"/>) are independent.
     /// Inside a Fog Tile GetAbility returns null and both drop automatically.
     /// </summary>
-    public class ArmoredChecker : BaseChecker, ICaptureImmunity, IBlockadeOverride, IPermanent
+    public class ArmoredChecker : SpecialChecker, ICaptureImmunity, IBlockadeOverride
     {
         public const string Id = "checker_armored";
-
-        public override string TypeId => Id;
 
         // --- ICaptureImmunity ---
         public bool IsImmune => true;                 // Permanent armor, never runs out.
@@ -23,14 +20,6 @@ namespace Tavla.Core.Checkers
         // --- IBlockadeOverride ---
         public bool FormsBlockadeAlone => true;
 
-        // --- IPurchasable ---
-        public string ItemId => Id;
-        public string DisplayName => "Armored Checker";
-        public int Price => 500;
-
-        /// <summary>More than one copy of this checker can be put in the deck.</summary>
-        public bool AllowsDuplicates => true;
-
-        public ArmoredChecker(int ownerId) : base(ownerId) { }
+        public ArmoredChecker(int ownerId) : base(ownerId, Id, "Armored Checker") { }
     }
 }

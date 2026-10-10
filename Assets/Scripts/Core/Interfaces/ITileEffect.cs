@@ -15,7 +15,15 @@ namespace Tavla.Core.Interfaces
     ///   OnCheckerLanded      -> Spike Pit, Maelstrom, Swamp, Fog, Toll Booth, Powder Keg
     ///   OnCheckerLeft        -> Fog (restore abilities), Powder Keg (stop the fuse)
     ///   OnCheckerPassedOver  -> Toll Booth ("every checker that passes or sits here")
-    ///   OnTurnPassed         -> Dungeon (open/close), Powder Keg (countdown), Plunder Cove
+    ///   OnTurnPassed         -> Powder Keg (the owner's countdown), Swamp, Plunder Cove
+    ///   OnRoundPassed        -> Dungeon (open/close — per round, so both players see both states)
+    ///
+    /// Optional capabilities live in their own interfaces so tiles without them carry no extra members:
+    ///   <see cref="IReleasableLock"/> -> Swamp (a die can be sacrificed to free a stuck checker)
+    ///
+    /// A checker immune to tiles (Reckless) never reaches the per-checker hooks: GameState filters it out through
+    /// <see cref="BaseChecker.IsAffectedByTiles"/>. Only a hook that walks the point's checkers itself
+    /// (Plunder Cove's OnTurnPassed) has to ask.
     /// </summary>
     public interface ITileEffect
     {
@@ -49,7 +57,14 @@ namespace Tavla.Core.Interfaces
         /// <summary>When a checker passes OVER this point without stopping. Used by the Toll Booth.</summary>
         void OnCheckerPassedOver(IMatchContext context, Node node, BaseChecker checker);
 
-        /// <summary>Called at the end of every turn. Countdowns and open/close cycles run here.</summary>
-        void OnTurnPassed(IMatchContext context, Node node);
+        /// <summary>Called at the end of every turn. Countdowns run here.</summary>
+        /// <param name="endingPlayerId">The player whose turn has just ended.</param>
+        void OnTurnPassed(IMatchContext context, Node node, int endingPlayerId);
+
+        /// <summary>
+        /// Called when a full round has ended, i.e. the turn returns to a player who has already played in it —
+        /// normally once both players have moved. Cycles that every player must see run here (Dungeon).
+        /// </summary>
+        void OnRoundPassed(IMatchContext context, Node node);
     }
 }

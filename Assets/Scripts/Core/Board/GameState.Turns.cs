@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
 using Tavla.Core.Abilities;
+using Tavla.Core.Checkers;
+using Tavla.Core.Interfaces;
 using Tavla.Core.Runtime;
 
 namespace Tavla.Core.Board
@@ -30,6 +34,60 @@ namespace Tavla.Core.Board
                 roll.Consume(distance);
         }
 
+        /// <summary>Is any die left to pay with? Without a dice system there always is.</summary>
+        private bool HasDiceLeft()
+        {
+            DiceRoll roll = Context != null ? Context.CurrentRoll : null;
+            return roll == null || roll.HasMovesLeft;
+        }
+
+        /// <summary>Teleporter Checker: its free move costs every die left.</summary>
+        private void ConsumeAllDice()
+        {
+            DiceRoll roll = Context != null ? Context.CurrentRoll : null;
+            if (roll != null)
+                roll.ConsumeAll();
+        }
+
+        /// <summary>
+        /// MatchContext reports every finished roll here. The rolling player's checkers on the board react to it
+        /// (Kraken). They are collected first: a reaction may capture checkers and reshape the points being scanned.
+        /// A simulation context never rolls, so the bot's look-ahead cannot trigger this.
+        /// </summary>
+        internal void NotifyDiceRolled(int playerId, DiceRoll roll)
+        {
+            if (!SideEffectsEnabled || IsMatchOver)
+                return;
+
+            List<BaseChecker> reacting = null;
+            for (int i = 0; i < NodeCount; i++)
+            {
+                Node node = _nodes[i];
+                for (int c = 0; c < node.CheckerCount; c++)
+                {
+                    BaseChecker checker = node.Checkers[c];
+                    if (checker.OwnerId != playerId || checker.GetAbility<IRollReactor>() == null)
+                        continue;
+
+                    if (reacting == null)
+                        reacting = new List<BaseChecker>();
+
+                    reacting.Add(checker);
+                }
+            }
+
+            if (reacting == null)
+                return;
+
+            for (int i = 0; i < reacting.Count && !IsMatchOver; i++)
+            {
+                // An earlier reaction may have taken this checker off the board or into the Fog.
+                IRollReactor reactor = reacting[i].GetAbility<IRollReactor>();
+                if (reactor != null && IsOnBoard(FindNodeIndexOf(reacting[i])))
+                    reactor.OnDiceRolled(Context, roll);
+            }
+        }
+
         #endregion
 
         #region Turn flow
@@ -42,7 +100,7 @@ namespace Tavla.Core.Board
         }
 
         /// <summary>
-        /// Ends the turn: ticks tile counters, runs end-of-turn abilities and passes the turn on.
+        /// Ends the turn: ticks tile counters, counts the turn and passes it on.
         /// </summary>
         public void EndTurn()
         {
@@ -50,35 +108,11 @@ namespace Tavla.Core.Board
             if (IsMatchOver)
                 return;
 
-            for (int i = 0; i < NodeCount; i++)
-            {
-                Node node = _nodes[i];
+            int endingPlayerId = CurrentPlayerId;
+            NotifyTiles((tile, node) => tile.OnTurnPassed(Context, node, endingPlayerId));
 
-                if (SideEffectsEnabled && node.ActiveTile != null)
-                {
-                    node.ActiveTile.OnTurnPassed(Context, node);
-
-                    if (node.ActiveTile.IsExpired)
-                        node.ClearTile();
-                }
-
-                if (!SideEffectsEnabled)
-                    continue;
-
-                // Iterate back to front: abilities such as the Greedy Checker may change the point's contents.
-                for (int c = node.CheckerCount - 1; c >= 0; c--)
-                {
-                    if (c >= node.CheckerCount)
-                        continue;
-
-                    ITurnEndReactor reactor = node.Checkers[c].GetAbility<ITurnEndReactor>();
-                    if (reactor != null)
-                        reactor.OnTurnEnded(Context, i);
-                }
-            }
-
-            // A tile or ability above may have ended the match (a Powder Keg destroying the last checker,
-            // a score reaching the target). The turn must not be counted or passed on after that.
+            // A tile above may have ended the match (a Powder Keg destroying the last checker).
+            // The turn must not be counted or passed on after that.
             if (IsMatchOver)
                 return;
 
@@ -104,11 +138,28 @@ namespace Tavla.Core.Board
         /// both the rule engine's (captures, bear-off) and the abilities' own AddScore calls.
         /// Ends the match the moment the scoring player reaches the target.
         /// A simulation context never calls this, so the bot's look-ahead cannot end the real match.
+        /// While a bear-off holds the end, reaching the target is only noted; <see cref="ReleaseMatchEnd"/> acts on it.
         /// </summary>
         internal void NotifyScoreChanged(int playerId, int totalScore)
         {
-            if (!IsMatchOver && _rules.IsTargetReached(playerId, totalScore))
+            if (IsMatchOver || !_rules.IsTargetReached(playerId, totalScore))
+                return;
+
+            if (_holdMatchEnd)
+                _matchEndHeld = true;
+            else
                 FinishMatch();
+        }
+
+        /// <summary>Lifts a bear-off's hold and ends the match if the target was reached while it was held.</summary>
+        private void ReleaseMatchEnd()
+        {
+            _holdMatchEnd = false;
+            if (!_matchEndHeld)
+                return;
+
+            _matchEndHeld = false;
+            FinishMatch();
         }
 
         /// <summary>
@@ -202,6 +253,8 @@ namespace Tavla.Core.Board
 
         private void AdvanceTurn()
         {
+            _playedThisRound[CurrentPlayerId] = true;
+
             int next = (CurrentPlayerId + 1) % PlayerCount;
 
             if (_skipNextTurn[next])
@@ -215,8 +268,49 @@ namespace Tavla.Core.Board
             if (_outOfCheckers[next])
                 next = (next + 1) % PlayerCount;
 
+            // A round is over once the turn comes back to a player who has already played in it: normally
+            // after both players, but also when a skip or the final stretch hands one player the next turn.
+            if (_playedThisRound[next])
+            {
+                CompleteRound();
+
+                // A round hook may have ended the match; then the turn is not passed on.
+                if (IsMatchOver)
+                    return;
+            }
+
             CurrentPlayerId = next;
             TurnChanged?.Invoke(CurrentPlayerId);
+        }
+
+        private void CompleteRound()
+        {
+            Array.Clear(_playedThisRound, 0, _playedThisRound.Length);
+            NotifyTiles((tile, node) => tile.OnRoundPassed(Context, node));
+        }
+
+        /// <summary>
+        /// Runs a turn-flow hook on every tile, then removes the tiles that expired because of it.
+        /// Skipped in simulations: tile objects are shared with the real board.
+        /// </summary>
+        private void NotifyTiles(Action<ITileEffect, Node> hook)
+        {
+            if (!SideEffectsEnabled)
+                return;
+
+            for (int i = 0; i < NodeCount; i++)
+            {
+                Node node = _nodes[i];
+                ITileEffect tile = node.ActiveTile;
+                if (tile == null)
+                    continue;
+
+                hook(tile, node);
+
+                // The hook may already have cleared the tile through a checker leaving the point.
+                if (tile.IsExpired && node.ActiveTile == tile)
+                    node.ClearTile();
+            }
         }
 
         #endregion

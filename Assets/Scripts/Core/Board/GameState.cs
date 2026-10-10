@@ -10,9 +10,10 @@ namespace Tavla.Core.Board
     /// The SINGLE source of truth of the game. Pure C#.
     ///
     /// DESIGN PROMISE: not a single concrete checker or tile name appears in this class.
-    /// Even with 18 checkers and 8 tiles in the game, GameState knows none of them; it only asks
+    /// Whatever checkers and tiles the game has, GameState knows none of them; it only asks
     /// "does this checker have this ability?" (GetAbility) and "what does this tile say?" (ITileEffect).
-    /// Adding a new checker does NOT change this class (Open/Closed).
+    /// Adding a checker that uses an existing ability does NOT change this class (Open/Closed); only a
+    /// new KIND of rule (a new ability interface) adds a question here.
     ///
     /// The same promise holds for game modes: how a match is won and how long it lasts comes from
     /// <see cref="MatchRules"/>, and where checkers start comes from <see cref="StartingLayout"/>.
@@ -22,8 +23,11 @@ namespace Tavla.Core.Board
     ///   GameState.Moves.cs        -> public move API and single-move resolution
     ///   GameState.CompoundMoves.cs-> combining dice into a multi-step move
     ///   GameState.BearOff.cs      -> bearing off
+    ///   GameState.Swaps.cs        -> swapping places with a friendly checker
+    ///   GameState.Releases.cs     -> freeing a locked checker by sacrificing a die
+    ///   GameState.Sacrifices.cs   -> sacrificing a checker for its ability
     ///   GameState.Captures.cs     -> captures, forced relocation, hook dispatch
-    ///   GameState.Turns.cs        -> dice bridge, turn flow, match end
+    ///   GameState.Turns.cs        -> dice bridge, turn flow, rounds, match end
     /// </summary>
     public partial class GameState
     {
@@ -33,20 +37,19 @@ namespace Tavla.Core.Board
         public const int BarIndex = -1;
 
         /// <summary>
-        /// Maximum number of checkers a player can field — one per <see cref="StartingLayout"/> slot.
-        /// A side may start with fewer; what happens when a side runs out is decided by <see cref="MatchRules"/>.
+        /// Fewest checkers a player can start with — the smallest count <see cref="StartingPatterns"/> has a
+        /// formation for. What happens when a side later runs out is decided by <see cref="MatchRules"/>.
         /// </summary>
+        public const int MinCheckersPerPlayer = 5;
+
+        /// <summary>Most checkers a player can start with — the largest count <see cref="StartingPatterns"/> has a formation for.</summary>
         public const int MaxCheckersPerPlayer = 15;
 
         /// <summary>
-        /// Number of checkers allowed on one point: 5.
-        ///
-        /// This is a DEFAULT, not a hard ceiling. <see cref="Node.GetStackLimit"/> asks the checkers
-        /// on the point "does anyone change this limit?"; the Vortex Checker says yes and lifts it.
-        /// Stacking all 15 checkers on one point is still possible — it just is not free anymore,
-        /// it requires buying that checker.
+        /// Number of checkers allowed on one point: 5, whoever they belong to. A Parasite that infiltrates an enemy
+        /// point counts towards the limit like the enemies it shares the point with.
         /// </summary>
-        public const int DefaultStackLimit = 5;
+        public const int StackLimit = 5;
 
         #region Arcade rules
 
@@ -65,11 +68,18 @@ namespace Tavla.Core.Board
         /// <summary>Width of the home board (the last 6 points).</summary>
         public const int HomeBoardSize = 6;
 
-        /// <summary>RAW score for capturing an opponent checker. Multipliers are applied in MatchContext.</summary>
-        public const int CaptureScore = 10;
+        /// <summary>
+        /// The design document counts score in small whole numbers (a capture is 1). The game keeps every score
+        /// this many times larger, so a design value is written as <c>n * ScoreScale</c> wherever it appears — the
+        /// run assets' target scores use the same scale.
+        /// </summary>
+        public const int ScoreScale = 10;
+
+        /// <summary>RAW score for capturing an opponent checker, before the capturer's own modifier (Catalyst).</summary>
+        public const int CaptureScore = 1 * ScoreScale;
 
         /// <summary>RAW score for bearing off a checker.</summary>
-        public const int BearOffScore = 20;
+        public const int BearOffScore = 3 * ScoreScale;
 
         /// <summary>Default match length in Classic mode — total number of turns of both players.</summary>
         public const int DefaultTurnLimit = 30;
@@ -87,6 +97,15 @@ namespace Tavla.Core.Board
         // Latched when a player's LAST checker leaves play (borne off or destroyed); never computed on the fly.
         // A side that never had checkers — a hand-built test position — is therefore not treated as finished.
         private readonly bool[] _outOfCheckers = new bool[PlayerCount];
+
+        // Who has taken a turn in the current round. A round ends when the turn returns to one of them
+        // (see AdvanceTurn); round-based tiles such as the Dungeon run on that boundary.
+        private readonly bool[] _playedThisRound = new bool[PlayerCount];
+
+        // Set while a bear-off resolves: a target its score reaches only ends the match once the borne-off checker
+        // has reacted (see ResolveBearOff). _matchEndHeld remembers that the target was reached meanwhile.
+        private bool _holdMatchEnd;
+        private bool _matchEndHeld;
 
         private readonly MatchRules _rules;
 
@@ -123,7 +142,7 @@ namespace Tavla.Core.Board
         /// <summary>
         /// Cloned boards SHARE checker and tile OBJECTS with the real board. While this flag is set
         /// side-effect hooks never run — otherwise the bot's look-ahead would corrupt REAL checker
-        /// state such as the Navigator's visited points, the Siege trigger or shield charges.
+        /// state such as the Phoenix's rebirth count or shield charges.
         /// The rules themselves (direction, distance, dice, blockades, captures, bear-off) still apply.
         /// </summary>
         public bool IsSimulation { get; private set; }
@@ -145,8 +164,33 @@ namespace Tavla.Core.Board
         /// <summary>A checker was removed from the game entirely (Sacrificial Checker, Powder Keg, bear-off). (checker, point index)</summary>
         public event Action<BaseChecker, int> CheckerDestroyed;
 
+        /// <summary>
+        /// A NEW checker entered the match mid-way — a captured checker changed sides (Mutiny). The View spawns
+        /// its visual. (checker, point index)
+        /// </summary>
+        public event Action<BaseChecker, int> CheckerAdded;
+
+        /// <summary>
+        /// A checker was sacrificed for its ability (Second Chance). It has left play — raised after
+        /// <see cref="CheckerDestroyed"/> — and the dice may have changed. (checker, point index)
+        /// </summary>
+        public event Action<BaseChecker, int> CheckerSacrificed;
+
+        /// <summary>
+        /// A checker was lost FOR GOOD, not just for this match: in a run it also leaves the player's deck.
+        /// Raised for a checker sacrificed for its ability (Second Chance) and for one a tile destroys outright
+        /// (Powder Keg), after <see cref="CheckerDestroyed"/> and before the match may end. (checker, point index)
+        /// </summary>
+        public event Action<BaseChecker, int> CheckerLostForGood;
+
         /// <summary>A checker was forcibly moved to another point (Maelstrom). (checker, old point, new point)</summary>
         public event Action<BaseChecker, int, int> CheckerTeleported;
+
+        /// <summary>
+        /// A locked checker was freed by sacrificing a die (Swamp). It did not move, but a die was spent.
+        /// (checker, point index)
+        /// </summary>
+        public event Action<BaseChecker, int> CheckerReleased;
 
         /// <summary>A special tile was triggered. (tile, point index, affected checker)</summary>
         public event Action<ITileEffect, int, BaseChecker> TileTriggered;
@@ -218,40 +262,32 @@ namespace Tavla.Core.Board
 
         #region Setup
 
-        /// <summary>The classic board: <see cref="MaxCheckersPerPlayer"/> checkers per player in the 2-5-3-5 formation.</summary>
-        public void SetupStandardBoard(Func<int, BaseChecker> checkerFactory = null)
-        {
-            if (checkerFactory == null)
-                checkerFactory = ownerId => new DefaultChecker(ownerId);
-
-            for (int p = 0; p < PlayerCount; p++)
-            {
-                BaseChecker[] checkers = new BaseChecker[MaxCheckersPerPlayer];
-                for (int k = 0; k < checkers.Length; k++)
-                    checkers[k] = checkerFactory(p);
-
-                SetupPlayer(p, checkers);
-            }
-        }
-
         /// <summary>
-        /// Places a player's starting checkers following <see cref="StartingLayout"/>: <c>checkers[k]</c> goes to
-        /// slot k. The order of the list is therefore meaningful — the caller decides which checker takes which slot.
+        /// Places a player's starting checkers on the dealt <paramref name="layout"/>: <c>checkers[k]</c> goes to
+        /// the layout's slot k. Set both players up from the SAME layout — it is dealt for both sides together.
         /// Everything is validated before the first checker is placed, so a rejected call leaves the board untouched.
         /// </summary>
-        /// <exception cref="ArgumentOutOfRangeException">Invalid player, or a count outside 1..<see cref="MaxCheckersPerPlayer"/>.</exception>
-        /// <exception cref="ArgumentException">A null entry, or a checker owned by the other player.</exception>
-        /// <exception cref="InvalidOperationException">The player already has checkers in play.</exception>
-        public void SetupPlayer(int playerId, IReadOnlyList<BaseChecker> checkers)
+        /// <exception cref="ArgumentOutOfRangeException">Invalid player.</exception>
+        /// <exception cref="ArgumentException">
+        /// The count differs from what the layout deals the player, a null entry, or a checker owned by the other player.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// The player already has checkers in play, or a layout point holds the other player's checkers.
+        /// </exception>
+        public void SetupPlayer(int playerId, IReadOnlyList<BaseChecker> checkers, StartingLayout layout)
         {
             ThrowIfInvalidPlayer(playerId);
 
             if (checkers == null)
                 throw new ArgumentNullException(nameof(checkers));
 
-            if (checkers.Count < 1 || checkers.Count > MaxCheckersPerPlayer)
-                throw new ArgumentOutOfRangeException(nameof(checkers), checkers.Count,
-                    $"A player starts with 1..{MaxCheckersPerPlayer} checkers.");
+            if (layout == null)
+                throw new ArgumentNullException(nameof(layout));
+
+            if (checkers.Count != layout.GetCheckerCount(playerId))
+                throw new ArgumentException(
+                    $"The layout deals {layout.GetCheckerCount(playerId)} checkers to player {playerId}, " +
+                    $"but {checkers.Count} were given.", nameof(checkers));
 
             for (int k = 0; k < checkers.Count; k++)
             {
@@ -267,19 +303,16 @@ namespace Tavla.Core.Board
                 throw new InvalidOperationException($"Player {playerId} is already set up.");
 
             for (int k = 0; k < checkers.Count; k++)
-                _nodes[StartingLayout.GetPoint(playerId, k)].Push(checkers[k]);
-        }
+            {
+                int point = layout.GetPoint(playerId, k);
+                if (_nodes[point].CountEnemiesOf(playerId) > 0)
+                    throw new InvalidOperationException(
+                        $"Point {point} already holds player {GetOpponent(playerId)}'s checkers; " +
+                        "set both players up from the same layout.");
+            }
 
-        /// <summary>Deck building: replaces a standard checker with a special one (after a shop purchase).</summary>
-        public bool ReplaceChecker(int nodeIndex, BaseChecker oldChecker, BaseChecker newChecker)
-        {
-            // Setup path: the checker does not "leave the point", another one takes its place.
-            // The tile hook is intentionally not fired (no Fog/Swamp record can exist before the match starts).
-            if (!IsOnBoard(nodeIndex) || !_nodes[nodeIndex].Remove(oldChecker))
-                return false;
-
-            _nodes[nodeIndex].Push(newChecker);
-            return true;
+            for (int k = 0; k < checkers.Count; k++)
+                _nodes[layout.GetPoint(playerId, k)].Push(checkers[k]);
         }
 
         public void PlaceTile(int nodeIndex, ITileEffect effect)
@@ -303,7 +336,12 @@ namespace Tavla.Core.Board
         /// The dice are copied too: otherwise CanAffordDistance would assume "no context" and accept any
         /// distance between 1 and 6, and the bot would plan with dice it does not have.
         /// </summary>
-        public GameState Clone()
+        /// <param name="substitute">
+        /// Optional: every checker passes through it on its way into the copy, and the copy holds what it returns.
+        /// The bot uses it to replace the checkers it must not know with plain ones. It has to return a checker
+        /// of the same owner; returning the checker itself keeps it.
+        /// </param>
+        public GameState Clone(Func<BaseChecker, BaseChecker> substitute = null)
         {
             // The rules are immutable, so sharing them is safe — and required: a clone running under
             // different rules would end matches (and value moves) differently from the real board.
@@ -321,7 +359,10 @@ namespace Tavla.Core.Board
                 copy._borneOff[p] = _borneOff[p];
                 copy._skipNextTurn[p] = _skipNextTurn[p];
                 copy._outOfCheckers[p] = _outOfCheckers[p];
-                copy._bar[p].AddRange(_bar[p]);
+                copy._playedThisRound[p] = _playedThisRound[p];
+
+                for (int c = 0; c < _bar[p].Count; c++)
+                    copy._bar[p].Add(Substitute(_bar[p][c], substitute));
             }
 
             for (int i = 0; i < NodeCount; i++)
@@ -332,14 +373,30 @@ namespace Tavla.Core.Board
                 if (original.ActiveTile != null)
                     cloned.SetTile(original.ActiveTile);
 
+                for (int p = 0; p < PlayerCount; p++)
+                    cloned.SetMark(p, original.GetMark(p));
+
                 // Push bottom to top so the stack order is preserved.
                 for (int c = 0; c < original.CheckerCount; c++)
-                    cloned.Push(original.Checkers[c]);
+                    cloned.Push(Substitute(original.Checkers[c], substitute));
             }
 
             copy.Bind(new SimulationContext(copy, Context));
 
             return copy;
+        }
+
+        private static BaseChecker Substitute(BaseChecker checker, Func<BaseChecker, BaseChecker> substitute)
+        {
+            if (substitute == null)
+                return checker;
+
+            // A checker that changed sides would quietly corrupt every per-player count of the copy.
+            BaseChecker replacement = substitute(checker);
+            if (replacement == null || replacement.OwnerId != checker.OwnerId)
+                throw new InvalidOperationException("A substitute checker must belong to the same player.");
+
+            return replacement;
         }
 
         #endregion
@@ -382,13 +439,23 @@ namespace Tavla.Core.Board
             return false;
         }
 
+        /// <summary>The player's checkers on the board and on the bar.</summary>
+        private int CountInPlay(int playerId)
+        {
+            int count = _bar[playerId].Count;
+            for (int i = 0; i < NodeCount; i++)
+                count += _nodes[i].CountFor(playerId);
+
+            return count;
+        }
+
         public static bool IsOnBoard(int index) => index >= 0 && index < NodeCount;
 
         public static int GetOpponent(int playerId) => (playerId + 1) % PlayerCount;
 
         public static int GetDirection(int playerId) => playerId == 0 ? 1 : -1;
 
-        /// <summary>Starting point the Phoenix Checker returns to.</summary>
+        /// <summary>Starting point the Phoenix Checker returns to (it moves on past it while it is full).</summary>
         public static int GetHomeEntryIndex(int playerId) => playerId == 0 ? 0 : NodeCount - 1;
 
         private static int GetBarOrigin(int playerId) => playerId == 0 ? -1 : NodeCount;
@@ -425,10 +492,12 @@ namespace Tavla.Core.Board
             return InvalidIndex;
         }
 
-        private static void ThrowIfInvalidPlayer(int playerId)
+        /// <summary>The one check of a player id, shared by Core's public API.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The id is not 0 .. PlayerCount-1.</exception>
+        internal static void ThrowIfInvalidPlayer(int playerId, string paramName = "playerId")
         {
             if (!IsValidPlayer(playerId))
-                throw new ArgumentOutOfRangeException(nameof(playerId), playerId,
+                throw new ArgumentOutOfRangeException(paramName, playerId,
                     $"Player id must be in the range 0..{PlayerCount - 1}.");
         }
 

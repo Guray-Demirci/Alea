@@ -119,70 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1001 &157459422
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: -2253911629886400664, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_Name
-      value: HUD
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 38795.242
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 41896.61
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7878350319992209165, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects:
-    - {fileID: 525884136896187580, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-    m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: -2253911629886400664, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1690880812}
-    - targetCorrespondingSourceObject: {fileID: -2253911629886400664, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1690880813}
-  m_SourcePrefab: {fileID: -8435245712485981826, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
 --- !u!1 &518068162
 GameObject:
   m_ObjectHideFlags: 0
@@ -368,8 +304,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Tavla.View::Tavla.View.BoardManager
   _layout: {fileID: 0}
   _checkerSprite: {fileID: 21300000, guid: a1b2c3d4e5f60718293a4b5c6d7e8f90, type: 3}
+  _playerCheckers:
+    Normal: {fileID: 21300000, guid: 767d3337647ce6da87a1b50968deb3be, type: 3}
+    Movable: {fileID: 21300000, guid: 7d79e8b945259859dfc209c0a899d17b, type: 3}
+    Selected: {fileID: 21300000, guid: 681d2525ad6824e959ca11d68d5c64ea, type: 3}
+    MovableRing: {fileID: 0}
+    SelectedRing: {fileID: 0}
+  _opponentCheckers:
+    Normal: {fileID: 21300000, guid: 5601163739a995dcbcda847d93f21488, type: 3}
+    Movable: {fileID: 0}
+    Selected: {fileID: 0}
+    MovableRing: {fileID: 0}
+    SelectedRing: {fileID: 0}
+  _checkerArt: {fileID: 11400000, guid: 35f960226311ec249dd5db50834dadc8, type: 2}
   _boardSprite: {fileID: 21300000, guid: 0f1e2d3c4b5a69788796a5b4c3d2e1f0, type: 3}
   _backgroundSprite: {fileID: 21300000, guid: c29f4812d1414dd2821f4b2770d75a83, type: 3}
+  _pointsSprite: {fileID: 21300000, guid: b84b7cdf653766efc54321a2f9706837, type: 3}
+  _pointHighlightSprite: {fileID: 21300000, guid: 951e839bd42ae55282ad24cbd56e62d7, type: 3}
   _checkerPrefab: {fileID: 0}
   _nodePrefab: {fileID: 0}
   _player0Color: {r: 1, g: 1, b: 1, a: 1}
@@ -377,12 +328,84 @@ MonoBehaviour:
   _bearOffTrayColor: {r: 1, g: 1, b: 1, a: 0.08}
   _hud: {fileID: 0}
   _configureCamera: 1
+  _cameraBackgroundColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
   _botPlayerId: 1
   _botThinkDelay: 0.6
   _botMoveDelay: 0.35
   _autoEndTurn: 1
   _autoEndDelay: 0.6
-  _endTurnKey: 32
+  _endTurnAction:
+    m_Name: EndTurn
+    m_Type: 1
+    m_ExpectedControlType: 
+    m_Id: 8bd6e9e8-c375-4ecc-8ade-a6c1f8b73c1c
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings:
+    - m_Name: 
+      m_Id: f61575a6-2ccf-4e46-a7ce-cba88e2dad5f
+      m_Path: <Keyboard>/space
+      m_Interactions: 
+      m_Processors: 
+      m_Groups: 
+      m_Action: EndTurn
+      m_Flags: 0
+    m_Flags: 0
+  _run: {fileID: 11400000, guid: 05723f625fa84b8a80500a75ce546da3, type: 2}
+  _nextMatchDelay: 2.5
+  _shopArt: {fileID: 11400000, guid: 161c9f860b1145e9b5b3a0f214522d98, type: 2}
+  _shopTexts:
+    HudTask: SHOP
+    Hint: CLICK AN ITEM TO BUY
+    Next: NEXT MATCH
+    Reroll: REROLL {0}G
+    NoRerollsLeft: NO REROLLS LEFT
+    Item: '{0} {1}G'
+    SpecialChecker: '{0} T{2} {1}G'
+    BasicChecker: CHECKER +1
+    Sold: '{0} SOLD'
+    Bought: BOUGHT {0}
+    Empty: NOTHING LEFT
+    NotEnoughGold: NOT ENOUGH GOLD
+    DeckFull: DECK IS FULL
+    TooManySpecialCheckers: MAX {0} SPECIAL CHECKERS
+    AlreadyOwned: ALREADY OWNED
+    Codes:
+    - ItemId: checker_armored
+      Code: AR
+    - ItemId: checker_nomad
+      Code: NO
+    - ItemId: checker_parasite
+      Code: PA
+    - ItemId: checker_timebender
+      Code: TB
+    - ItemId: checker_bouncer
+      Code: BO
+    - ItemId: checker_doubledown
+      Code: DD
+    - ItemId: checker_catalyst
+      Code: CA
+    - ItemId: checker_navigator
+      Code: NA
+    - ItemId: checker_siege
+      Code: SI
+    - ItemId: checker_sacrificial
+      Code: SA
+    - ItemId: checker_greedy
+      Code: GR
+    - ItemId: checker_tax
+      Code: TX
+    - ItemId: checker_anchor
+      Code: AN
+    - ItemId: checker_phoenix
+      Code: PH
+    - ItemId: checker_doomsday
+      Code: DM
+  _targetScore: 0
+  _turnLimit: 30
+  _finalStretchTurns: 3
+  _player0Checkers: 15
+  _player1Checkers: 15
   _randomSeed: 0
 --- !u!4 &1321423950
 Transform:
@@ -399,11 +422,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1690880811 stripped
+--- !u!1 &1690880811
 GameObject:
-  m_CorrespondingSourceObject: {fileID: -2253911629886400664, guid: 590e4f5d7751bda4681a8c958d7dd1ab, type: 3}
-  m_PrefabInstance: {fileID: 157459422}
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1690880814}
+  - component: {fileID: 1690880812}
+  - component: {fileID: 1690880813}
+  m_Layer: 0
+  m_Name: HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
 --- !u!114 &1690880812
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -416,38 +452,58 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df00109cdb60f6a469c16601b61e9704, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Tavla.View::Tavla.View.HudView
+  _panelSprite: {fileID: 21300000, guid: 140de56e54f3c6856fd377dda53bf9f0, type: 3}
+  _avatarBox:
+    x: 19
+    y: 19
+    width: 42
+    height: 42
   _sortingOrder: 200
   _textSortingOrder: 100
   _layout: {fileID: 0}
   _slots:
   - Field: 0
-    LayerName: Score
+    Box:
+      x: 20
+      y: 91
+      width: 40
+      height: 9
     Caption: SCORE
     PixelOffset: {x: 0, y: 0}
     Align: 1
     Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
-    FallbackPixel: {x: 44, y: 96}
   - Field: 1
-    LayerName: Gold
+    Box:
+      x: 20
+      y: 130
+      width: 40
+      height: 9
     Caption: GOLD
     PixelOffset: {x: 0, y: 0}
     Align: 1
     Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
-    FallbackPixel: {x: 44, y: 120}
   - Field: 2
-    LayerName: Hamle
+    Box:
+      x: 20
+      y: 111
+      width: 40
+      height: 9
     Caption: MOVE
     PixelOffset: {x: 0, y: 0}
     Align: 1
     Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
-    FallbackPixel: {x: 44, y: 144}
   - Field: 3
-    LayerName: Task
+    Box:
+      x: 20
+      y: 71
+      width: 40
+      height: 9
     Caption: TASK
     PixelOffset: {x: 0, y: 0}
     Align: 1
     Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
-    FallbackPixel: {x: 44, y: 64}
+  _boxPadding: 2
+  _captionGap: 3
 --- !u!114 &1690880813
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -464,11 +520,29 @@ MonoBehaviour:
   _playerId: 0
   _diceSeparator: ' '
   _emptyValue: '-'
-  _turnPrefix: 'TUR '
+  _turnsRemainingPrefix: 'TURN '
+  _winText: YOU WIN
+  _loseText: YOU LOSE
+  _drawText: DRAW
+--- !u!4 &1690880814
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1690880811}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 518068166}
   - {fileID: 1321423950}
-  - {fileID: 157459422}
+  - {fileID: 1690880814}

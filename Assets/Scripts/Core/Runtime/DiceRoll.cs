@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Tavla.Core.Runtime
@@ -30,11 +31,15 @@ namespace Tavla.Core.Runtime
 
         public bool HasMovesLeft => FreeSplit ? FreeTotal > 0 : _moves.Count > 0;
 
+        /// <summary>Moves spent so far this turn. The Dice Holder Checker reacts to the turn's first move.</summary>
+        public int MovesSpent { get; private set; }
+
         /// <summary>Sets the dice. A double grants 4 moves, as in the classic rules.</summary>
         internal void Set(int first, int second)
         {
             First = first;
             Second = second;
+            MovesSpent = 0;
 
             _moves.Clear();
             _moves.Add(first);
@@ -78,21 +83,41 @@ namespace Tavla.Core.Runtime
             else
                 _moves.Remove(distance);
 
+            MovesSpent++;
             return true;
         }
 
-        /// <summary>Double Down Checker: grants an extra move.</summary>
+        /// <summary>Teleporter Checker: one move that costs every die still in hand.</summary>
+        internal void ConsumeAll()
+        {
+            _moves.Clear();
+            FreeTotal = 0;
+            MovesSpent++;
+        }
+
+        /// <summary>Double Down and Second Chance Checkers: grants an extra move.</summary>
         internal void GrantExtraMove(int value)
         {
             _moves.Add(value);
             FreeTotal += value;
         }
 
-        /// <summary>Double Down Checker's bad outcome: all remaining moves of this turn are lost.</summary>
-        internal void LoseRemainingMoves()
+        /// <summary>Poisoned Rum Checker: only the first die counts this turn, the second is passed.</summary>
+        internal void DropSecondDie()
         {
+            Second = 0;
+
             _moves.Clear();
-            FreeTotal = 0;
+            _moves.Add(First);
+            FreeTotal = First;
+        }
+
+        /// <summary>Dice Holder Checker: every move still in hand is rolled again.</summary>
+        /// <param name="rollFace">Rolls one die face.</param>
+        internal void RerollRemaining(Func<int> rollFace)
+        {
+            for (int i = 0; i < _moves.Count; i++)
+                _moves[i] = rollFace();
         }
 
         /// <summary>
@@ -107,6 +132,7 @@ namespace Tavla.Core.Runtime
             copy.Second = Second;
             copy.FreeSplit = FreeSplit;
             copy.FreeTotal = FreeTotal;
+            copy.MovesSpent = MovesSpent;
             copy._moves.AddRange(_moves);
 
             return copy;

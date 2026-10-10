@@ -9,7 +9,7 @@ namespace Tavla.Core.Tiles
     /// Fog Tile. "ALL special abilities of every special checker that enters this point are
     /// completely disabled for as long as it stays there (it becomes a plain checker)."
     ///
-    /// THE ARCHITECTURE'S TEST: this tile neutralizes all 18 checkers without knowing any of them.
+    /// THE ARCHITECTURE'S TEST: this tile neutralizes every checker without knowing any of them.
     /// All it does is close the ability gate in BaseChecker; the rest of the rules engine asks
     /// everything through GetAbility, so the effect spreads everywhere on its own.
     /// Add 50 more checkers tomorrow — this file does not change.

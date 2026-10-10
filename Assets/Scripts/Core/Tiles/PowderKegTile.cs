@@ -9,8 +9,11 @@ namespace Tavla.Core.Tiles
     /// <summary>
     /// Powder Keg Tile (minefield). "When a checker steps here a 3-turn countdown starts.
     /// If you do not move the checker away within 3 turns the keg explodes and the checker is destroyed
-    /// PERMANENTLY (it does not even go to the bar)."
+    /// PERMANENTLY (it does not even go to the bar; you have to buy a new checker in the shop)."
+    /// Permanently means the run too: <see cref="GameState.DestroyChecker"/> takes it out of the player's deck.
     /// The countdown is per checker; every checker on the point has its own fuse.
+    /// Only the OWNER's turns count — they are the only turns in which the checker can be moved away.
+    /// The turn it stepped on is the first of the three, so the owner can still save it on the two turns after.
     /// </summary>
     public class PowderKegTile : BaseTileEffect
     {
@@ -47,7 +50,7 @@ namespace Tavla.Core.Tiles
                 context.Board.ReportAbility(AbilityIds.FuseDefused, checker, node.Index);
         }
 
-        public override void OnTurnPassed(IMatchContext context, Node node)
+        public override void OnTurnPassed(IMatchContext context, Node node, int endingPlayerId)
         {
             if (_fuses.Count == 0)
                 return;
@@ -60,6 +63,11 @@ namespace Tavla.Core.Tiles
             for (int i = 0; i < _fuseKeys.Count; i++)
             {
                 BaseChecker checker = _fuseKeys[i];
+
+                // The opponent's turn does not burn the owner's fuse.
+                if (checker.OwnerId != endingPlayerId)
+                    continue;
+
                 int remaining = _fuses[checker] - 1;
 
                 if (remaining > 0)

@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddb46c3d90b74581bc938566647e721a, type: 3}
+  m_Name: ShopArt
+  m_EditorClassIdentifier: Tavla.View::Tavla.View.ShopArtSet
+  _table: {fileID: 21300000, guid: 9793c490004d4abbb57b25fb975da48b, type: 3}
+  _rollButton: {fileID: 21300000, guid: 18e8ed853b744b68837223cd06388c85, type: 3}
+  _tierCushions:
+  - {fileID: 21300000, guid: 105ac9eb142a453ba1408f345e969cd6, type: 3}
+  - {fileID: 21300000, guid: cb53eec609e14f59a5d725bcf4766201, type: 3}
+  - {fileID: 21300000, guid: 66e6e301f142470a81153fc315691fc8, type: 3}
+  - {fileID: 21300000, guid: 7c3e9a15d4b24f0e8a6d2b9c1f58e0a3, type: 3}

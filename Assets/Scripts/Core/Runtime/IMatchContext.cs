@@ -17,15 +17,12 @@ namespace Tavla.Core.Runtime
         DiceRoll CurrentRoll { get; }
 
         // --- Score ---
-        /// <summary>For checkers that produce flat points, such as the Navigator.</summary>
-        /// <returns>The score actually written AFTER multipliers are applied.</returns>
+        /// <summary>For checkers that produce flat points, such as the Siege.</summary>
+        /// <returns>The score actually written (0 when a simulation discards it).</returns>
         int AddScore(int playerId, int amount);
 
         /// <summary>The player's total score. GameState uses it to decide the winner at the end of the match.</summary>
         int GetScore(int playerId);
-
-        /// <summary>Accumulates multipliers: Catalyst (x2 this turn) and Siege (permanent x2).</summary>
-        void AddScoreMultiplier(int playerId, float multiplier, bool permanent);
 
         /// <summary>Plunder Cove: resets all score produced during this turn.</summary>
         void ResetTurnScore(int playerId);
@@ -36,7 +33,7 @@ namespace Tavla.Core.Runtime
         /// <summary>Sacrificial Checker: permanently discounts every item in the shop.</summary>
         void AddShopDiscount(int amount);
 
-        /// <summary>Phoenix Checker: the next shop offers only rare+ items at 50% off.</summary>
+        /// <summary>Phoenix Checker: the next shop offers only rare+ items.</summary>
         void TriggerLuxuryShop(int playerId);
 
         // --- Turn / dice ---
@@ -45,5 +42,14 @@ namespace Tavla.Core.Runtime
 
         /// <summary>Anchor Checker &amp; Meridian Shift: pins one die of the next roll.</summary>
         void PinNextDie(int playerId, int value);
+
+        /// <summary>Poisoned Rum Checker: the player's next roll has a single die; the second is passed.</summary>
+        void RestrictNextRollToOneDie(int playerId);
+
+        /// <summary>Dice Holder Checker: rolls the player's unused dice of this turn again.</summary>
+        void RerollRemainingDice(int playerId);
+
+        /// <summary>Second Chance Checker: rolls one more die and adds it to the player's moves this turn.</summary>
+        void GrantExtraDie(int playerId);
     }
 }

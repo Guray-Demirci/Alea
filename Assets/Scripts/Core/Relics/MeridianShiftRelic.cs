@@ -12,7 +12,6 @@ namespace Tavla.Core.Relics
     {
         public override string ItemId => "relic_meridian_shift";
         public override string DisplayName => "Meridian Shift";
-        public override int Price => 180;
 
         /// <summary>It overrides the result directly, so it must run LAST.</summary>
         public override int Priority => 900;

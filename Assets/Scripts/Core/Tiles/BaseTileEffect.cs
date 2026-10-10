@@ -40,7 +40,9 @@ namespace Tavla.Core.Tiles
 
         public virtual void OnCheckerPassedOver(IMatchContext context, Node node, BaseChecker checker) { }
 
-        public virtual void OnTurnPassed(IMatchContext context, Node node) { }
+        public virtual void OnTurnPassed(IMatchContext context, Node node, int endingPlayerId) { }
+
+        public virtual void OnRoundPassed(IMatchContext context, Node node) { }
 
         protected BaseTileEffect(int ownerId = NeutralOwner)
         {
@@ -50,7 +52,7 @@ namespace Tavla.Core.Tiles
         /// <summary>Helper: id of the given checker's opponent (used as the "capturing side" when a tile captures).</summary>
         protected static int OpponentOf(BaseChecker checker)
         {
-            return (checker.OwnerId + 1) % GameState.PlayerCount;
+            return GameState.GetOpponent(checker.OwnerId);
         }
     }
 }

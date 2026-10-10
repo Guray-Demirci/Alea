@@ -11,7 +11,6 @@ namespace Tavla.Core.Relics
     {
         public override string ItemId => "relic_storm_report";
         public override string DisplayName => "Storm Report";
-        public override int Price => 350;
 
         public override int Priority => 10;
 

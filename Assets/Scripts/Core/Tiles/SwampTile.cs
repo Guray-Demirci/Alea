@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
+using Tavla.Core.Interfaces;
 using Tavla.Core.Runtime;
 
 namespace Tavla.Core.Tiles
@@ -10,19 +11,35 @@ namespace Tavla.Core.Tiles
     /// Swamp Tile. "Every checker that lands here has a 50% chance to get stuck (locked).
     /// Unlocking it requires sacrificing one of the dice on a later turn."
     /// The lock is kept PER CHECKER: one checker on the point may be stuck while another is free.
+    /// Freeing goes through <see cref="GameState.TryReleaseChecker"/>, which spends the die.
     /// </summary>
-    public class SwampTile : BaseTileEffect
+    public class SwampTile : BaseTileEffect, IReleasableLock
     {
         public const string Id = "tile_swamp";
         private const float StickChance = 0.5f;
 
         private readonly HashSet<BaseChecker> _stuck = new HashSet<BaseChecker>();
 
+        // Checkers that sank during the turn being played. "On a later turn" means they cannot be
+        // freed with the dice left over from the very turn they got stuck in.
+        private readonly HashSet<BaseChecker> _stuckThisTurn = new HashSet<BaseChecker>();
+
         public override string EffectId => Id;
 
         public override bool CanLeaveFrom(BaseChecker checker) => !_stuck.Contains(checker);
 
+        /// <summary>Is this checker locked here? For the View, to show the lock on the board.</summary>
         public bool IsStuck(BaseChecker checker) => _stuck.Contains(checker);
+
+        public bool CanRelease(BaseChecker checker) => _stuck.Contains(checker) && !_stuckThisTurn.Contains(checker);
+
+        public void Release(IMatchContext context, Node node, BaseChecker checker)
+        {
+            if (!_stuck.Remove(checker))
+                return;
+
+            context.Board.ReportAbility(AbilityIds.SwampReleased, checker, node.Index);
+        }
 
         public override void OnCheckerLanded(IMatchContext context, Node node, BaseChecker checker)
         {
@@ -30,6 +47,7 @@ namespace Tavla.Core.Tiles
                 return;
 
             _stuck.Add(checker);
+            _stuckThisTurn.Add(checker);
             context.Board.ReportAbility(AbilityIds.SwampStuck, checker, node.Index);
         }
 
@@ -37,23 +55,13 @@ namespace Tavla.Core.Tiles
         {
             // Once the checker has left the point the lock record is no longer needed (also prevents leaks).
             _stuck.Remove(checker);
+            _stuckThisTurn.Remove(checker);
         }
 
-        /// <summary>
-        /// The "sacrifice a die to unlock" action. It is NOT a move, so it does not go through TryMove;
-        /// it is called when the player chooses "free the checker" in the UI and spends the chosen die.
-        /// </summary>
-        public bool TryUnlock(IMatchContext context, BaseChecker checker, int sacrificedDieValue)
+        public override void OnTurnPassed(IMatchContext context, Node node, int endingPlayerId)
         {
-            if (!_stuck.Contains(checker))
-                return false;
-
-            if (context.CurrentRoll != null && !context.CurrentRoll.Consume(sacrificedDieValue))
-                return false;
-
-            _stuck.Remove(checker);
-            context.Board.ReportAbility(AbilityIds.SwampReleased, checker, context.Board.FindNodeIndexOf(checker));
-            return true;
+            // The turn they sank in is over; from now on a die can free them.
+            _stuckThisTurn.Clear();
         }
     }
 }

@@ -10,26 +10,34 @@ namespace Tavla.Core.Abilities
     /// </summary>
     public static class AbilityIds
     {
-        // --- Movement rules (GameState) ---
+        // --- Rules engine (GameState) ---
         public const string ExtraDistance = "ExtraDistance";
         public const string AreaCapture = "AreaCapture";
         public const string Infiltrate = "Infiltrate";
-        public const string BlockadeBypass = "BlockadeBypass";
         public const string ImmunityBlocked = "ImmunityBlocked";
+        public const string ScoreModified = "ScoreModified";
+        public const string Deviation = "Deviation";
+        public const string FreeMove = "FreeMove";
+        public const string Swap = "Swap";
+        public const string CaptureRetaliation = "CaptureRetaliation";
+        public const string CaptureConverted = "CaptureConverted";
+        public const string TileIgnored = "TileIgnored";
+        public const string PointMarked = "PointMarked";
 
         // --- Checkers ---
         public const string AnchorPin = "AnchorPin";
-        public const string BouncerSelfHit = "BouncerSelfHit";
-        public const string BouncerStrike = "BouncerStrike";
-        public const string Catalyst = "Catalyst";
+        public const string CloverSelfHit = "CloverSelfHit";
+        public const string CloverStrike = "CloverStrike";
+        public const string DiceHolderReroll = "DiceHolderReroll";
         public const string DoubleDownBonus = "DoubleDownBonus";
-        public const string DoubleDownPenalty = "DoubleDownPenalty";
-        public const string GeminiLink = "GeminiLink";
-        public const string GreedyIncome = "GreedyIncome";
-        public const string NavigatorTrail = "NavigatorTrail";
+        public const string GoldenIncome = "GoldenIncome";
+        public const string GrapplingHook = "GrapplingHook";
+        public const string KrakenAwakens = "KrakenAwakens";
         public const string PhoenixRebirth = "PhoenixRebirth";
+        public const string RumPoisoned = "RumPoisoned";
         public const string SacrificeDiscount = "SacrificeDiscount";
-        public const string SiegeLocked = "SiegeLocked";
+        public const string SecondChanceBonus = "SecondChanceBonus";
+        public const string SiegeBonus = "SiegeBonus";
         public const string TimeBend = "TimeBend";
         public const string TollCollected = "TollCollected";
 

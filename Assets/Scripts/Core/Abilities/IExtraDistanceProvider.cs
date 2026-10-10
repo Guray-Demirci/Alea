@@ -3,13 +3,18 @@ using Tavla.Core.Board;
 namespace Tavla.Core.Abilities
 {
     /// <summary>
-    /// Nomad Checker: "If the points to the left and right of its current point are completely empty,
+    /// Nomad Checker: "If the points to the left and right of the point a die brings it to are empty,
     /// it may move 3 extra points."
-    /// The bonus is ADDED to the die value during distance validation; it does not grant an extra move.
+    /// The bonus is ADDED to the die value during distance validation — for bearing off as well — and it does not
+    /// grant an extra move. When it can pay its part, it does: a smaller die plus the bonus is spent rather than
+    /// a die covering the whole distance.
     /// </summary>
     public interface IExtraDistanceProvider : ICheckerAbility
     {
-        /// <summary>Extra points this checker earns from its current position (may be 0).</summary>
-        int GetBonusDistance(GameState state, int fromIndex);
+        /// <summary>
+        /// Extra points this checker earns once a die has brought it to <paramref name="dieTargetIndex"/> (may be 0).
+        /// Asked before the move: the checker still stands on its source point (or on the bar).
+        /// </summary>
+        int GetBonusDistance(GameState state, int dieTargetIndex);
     }
 }

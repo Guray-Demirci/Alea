@@ -1,49 +1,28 @@
-using System.Collections.Generic;
 using Tavla.Core.Abilities;
 using Tavla.Core.Board;
-using Tavla.Core.Interfaces;
-using Tavla.Core.Runtime;
 
 namespace Tavla.Core.Checkers
 {
     /// <summary>
-    /// Navigator Checker. "Leaves footprints behind as it advances.
-    /// Grants 50 base points for EVERY NEW point it lands on."
-    /// "New" matters: landing on the same point again scores nothing, so the checker must
-    /// remember the points it has visited (the state belongs to the checker itself, SRP).
+    /// Navigator Checker. "Leaves footprints behind as it advances. On every point it has stepped on, capturing a
+    /// checker is worth 2 points and bearing one off 4." Both on the game's score scale
+    /// (<see cref="GameState.ScoreScale"/>).
+    ///
+    /// It scores nothing itself: it only marks every point it lands on — each stop of a compound move too — and any
+    /// of its owner's checkers then earns more there, the Navigator included: the footprint goes down as it lands,
+    /// so the checker it captures on a brand-new point already counts. The footprints are board state
+    /// (<see cref="ScoreMark"/>), so they stay for the rest of the match even if the Navigator is captured or borne off.
     /// </summary>
-    public class NavigatorChecker : BaseChecker, IMoveReactor, IPermanent
+    public class NavigatorChecker : SpecialChecker, IPointMarker
     {
         public const string Id = "checker_navigator";
-        private const int ScorePerNewNode = 50;
 
-        private readonly HashSet<int> _visited = new HashSet<int>();
+        /// <summary>The GDD's capture 2 / bear-off 4, on the game's score scale.</summary>
+        private static readonly ScoreMark Footprint =
+            new ScoreMark(2 * GameState.ScoreScale, 4 * GameState.ScoreScale);
 
-        public override string TypeId => Id;
+        public ScoreMark LandingMark => Footprint;
 
-        /// <summary>Visited points, so the View can draw the footprint trail.</summary>
-        public IEnumerable<int> VisitedNodes => _visited;
-
-        public void OnMoveCompleted(IMatchContext context, MoveResult result, bool isMover)
-        {
-            if (!isMover)
-                return;
-
-            // Add returns false if the point was visited before -> no score.
-            if (!_visited.Add(result.ToIndex))
-                return;
-
-            context.AddScore(OwnerId, ScorePerNewNode);
-            context.Board.ReportAbility(AbilityIds.NavigatorTrail, this, result.ToIndex);
-        }
-
-        public string ItemId => Id;
-        public string DisplayName => "Navigator Checker";
-        public int Price => 320;
-
-        /// <summary>More than one copy of this checker can be put in the deck.</summary>
-        public bool AllowsDuplicates => true;
-
-        public NavigatorChecker(int ownerId) : base(ownerId) { }
+        public NavigatorChecker(int ownerId) : base(ownerId, Id, "Navigator Checker") { }
     }
 }

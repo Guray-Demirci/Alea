@@ -9,12 +9,6 @@ namespace Tavla.Core.Relics
     /// </summary>
     public abstract class PermanentRelic : BaseRelic, IPermanent
     {
-        /// <summary>
-        /// A second copy of the same relic does nothing (effects do not stack),
-        /// so the shop locks it after one sale.
-        /// </summary>
-        public virtual bool AllowsDuplicates => false;
-
         /// <summary>A permanent relic is always active.</summary>
         public override bool IsActive => true;
     }

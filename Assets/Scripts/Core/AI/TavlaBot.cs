@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using Tavla.Core.Board;
+using Tavla.Core.Checkers;
 
 namespace Tavla.Core.AI
 {
@@ -12,6 +14,10 @@ namespace Tavla.Core.AI
     ///
     /// There is NO rule knowledge here. "Is this move legal?" is always asked of Core
     /// (GetLegalTargets / CanBearOff / TryMove) — like the View, the bot is a consumer of the rules, not their owner.
+    ///
+    /// The bot does NOT know the opponent's special checkers. It scores moves on a view of the board where every
+    /// opponent checker is a plain one: it sees where they stand, not what they are, so a Gunpowder Checker looks
+    /// like any other blot. Legality still comes from the real board, the way a human is shown the legal targets.
     /// </summary>
     public class TavlaBot
     {
@@ -25,7 +31,8 @@ namespace Tavla.Core.AI
         public TavlaBot(int myPlayerId)
         {
             _myPlayerId = myPlayerId;
-            _opponentId = myPlayerId == 0 ? 1 : 0;
+            _opponentId = GameState.GetOpponent(myPlayerId);
+            _disguise = Disguise;
         }
 
         #endregion
@@ -45,6 +52,9 @@ namespace Tavla.Core.AI
         // Reused between calls so move selection does not allocate new lists every time.
         private readonly List<int> _sources = new List<int>(GameState.NodeCount);
         private readonly List<int> _targets = new List<int>(GameState.NodeCount);
+
+        // Cached so building the view each move does not allocate a new delegate.
+        private readonly Func<BaseChecker, BaseChecker> _disguise;
 
         #region Evaluation
 
@@ -99,8 +109,8 @@ namespace Tavla.Core.AI
         #region Move selection
 
         /// <summary>
-        /// Tries every legal move and picks the highest-scoring one.
-        /// Does NOT change the board — all attempts are made on clones.
+        /// Tries every legal move and picks the highest-scoring one. A locked checker that can be freed
+        /// is freed first. Does NOT change the board — all attempts are made on clones.
         /// </summary>
         public BotMove ChooseBestMove(GameState board)
         {
@@ -112,6 +122,17 @@ namespace Tavla.Core.AI
 
             CollectSources(board, _sources);
 
+            // A locked checker is dead weight, so it is freed before anything else. A clone cannot price
+            // this — releasing moves no checker, so the evaluation would see no gain — hence a fixed rule.
+            for (int s = 0; s < _sources.Count; s++)
+            {
+                if (board.CanReleaseChecker(_sources[s]))
+                    return BotMove.Release(_sources[s], EvaluateBoard(board));
+            }
+
+            // Built once per move: every candidate is played on a clone of this view, never of the real board.
+            GameState view = board.Clone(_disguise);
+
             for (int s = 0; s < _sources.Count; s++)
             {
                 int from = _sources[s];
@@ -121,7 +142,7 @@ namespace Tavla.Core.AI
                 for (int t = 0; t < _targets.Count; t++)
                 {
                     int value;
-                    if (!TrySimulate(board, from, _targets[t], out value))
+                    if (!TrySimulate(view, from, _targets[t], out value))
                         continue;
 
                     if (value > bestScore)
@@ -136,7 +157,7 @@ namespace Tavla.Core.AI
                 if (board.CanBearOff(from))
                 {
                     int value;
-                    if (TrySimulate(board, from, GameState.BearOffIndex, out value) && value > bestScore)
+                    if (TrySimulate(view, from, GameState.BearOffIndex, out value) && value > bestScore)
                     {
                         bestScore = value;
                         best = new BotMove(from, GameState.BearOffIndex, value);
@@ -156,6 +177,9 @@ namespace Tavla.Core.AI
             BotMove move = ChooseBestMove(board);
             if (!move.IsValid)
                 return false;
+
+            if (move.IsRelease)
+                return board.TryReleaseChecker(move.FromIndex);
 
             return board.TryMove(move.FromIndex, move.ToIndex);
         }
@@ -186,19 +210,28 @@ namespace Tavla.Core.AI
         }
 
         /// <summary>
-        /// Plays the move on a clone and scores the result. Returns false if the move fails on the clone.
-        /// Never touches the real board, the real dice or the internal state of real checkers.
+        /// Plays the move on a clone of the bot's view and scores the result. Returns false if the move fails on
+        /// the clone. Never touches the real board, the real dice or the internal state of real checkers.
         /// </summary>
-        private bool TrySimulate(GameState board, int from, int to, out int value)
+        private bool TrySimulate(GameState view, int from, int to, out int value)
         {
             value = int.MinValue;
 
-            GameState virtualBoard = board.Clone();
+            GameState virtualBoard = view.Clone();
             if (!virtualBoard.TryMove(from, to))
                 return false;
 
             value = EvaluateBoard(virtualBoard);
             return true;
+        }
+
+        /// <summary>
+        /// What the bot sees of a checker: its own checkers as they are, the opponent's as plain checkers.
+        /// A plain stand-in has no ability to react, so no Gunpowder, Phoenix or Armored rule enters the score.
+        /// </summary>
+        private BaseChecker Disguise(BaseChecker checker)
+        {
+            return checker.OwnerId == _opponentId ? new DefaultChecker(_opponentId) : checker;
         }
 
         #endregion

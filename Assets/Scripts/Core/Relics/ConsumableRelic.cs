@@ -42,11 +42,6 @@ namespace Tavla.Core.Relics
             return true;
         }
 
-        public void Refill()
-        {
-            _charges.Refill();
-        }
-
         // --- IDiceModifier ---
         /// <summary>The dice system sees this relic ONLY during the turn it was armed.</summary>
         public override bool IsActive => IsArmed;

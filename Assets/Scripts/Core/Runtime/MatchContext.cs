@@ -6,24 +6,26 @@ using Tavla.Core.Relics;
 namespace Tavla.Core.Runtime
 {
     /// <summary>
-    /// Working implementation of <see cref="IMatchContext"/>: holds score, gold, multipliers, shop and dice state.
+    /// Working implementation of <see cref="IMatchContext"/>: holds score, gold, shop and dice state.
     /// Abilities see its INTERFACE, not this class — plugging in a fake context in tests is free.
     /// </summary>
     public class MatchContext : IMatchContext
     {
         /// <summary>
-        /// Toll Booth debt rule: for every gold the player cannot pay, this many score points are deducted.
+        /// Toll Booth debt rule: for every gold the player cannot pay, one design point of score is deducted.
         /// </summary>
-        public const int ScorePenaltyPerMissingGold = 10;
+        public const int ScorePenaltyPerMissingGold = 1 * GameState.ScoreScale;
 
         private readonly int[] _turnScore;
         private readonly int[] _totalScore;
         private readonly int[] _gold;
-        private readonly float[] _turnMultiplier;
-        private readonly float[] _permanentMultiplier;
         private readonly int[] _pinnedDie;
 
-        private readonly List<IDiceModifier> _diceModifiers = new List<IDiceModifier>();
+        // Poisoned Rum: players whose next roll keeps only one die.
+        private readonly bool[] _oneDieNextRoll;
+
+        // Per player: a relic bends only its owner's dice, never the opponent's.
+        private readonly List<IDiceModifier>[] _diceModifiers;
         private readonly DiceRoller _roller;
 
         public GameState Board { get; private set; }
@@ -44,20 +46,11 @@ namespace Tavla.Core.Runtime
         /// <summary>(playerId, total gold)</summary>
         public event Action<int, int> GoldChanged;
 
-        /// <summary>(playerId, effective multiplier = turn x permanent)</summary>
-        public event Action<int, float> MultiplierChanged;
-
         /// <summary>(playerId whose turn will be skipped)</summary>
         public event Action<int> TurnSkipped;
 
         /// <summary>(new roll of the current player)</summary>
         public event Action<DiceRoll> DiceRolled;
-
-        /// <summary>(total shop discount)</summary>
-        public event Action<int> ShopDiscountChanged;
-
-        /// <summary>(playerId who triggered the luxury shop)</summary>
-        public event Action<int> LuxuryShopTriggered;
 
         #endregion
 
@@ -71,15 +64,12 @@ namespace Tavla.Core.Runtime
             _turnScore = new int[players];
             _totalScore = new int[players];
             _gold = new int[players];
-            _turnMultiplier = new float[players];
-            _permanentMultiplier = new float[players];
             _pinnedDie = new int[players];
+            _oneDieNextRoll = new bool[players];
+            _diceModifiers = new List<IDiceModifier>[players];
 
             for (int p = 0; p < players; p++)
-            {
-                _turnMultiplier[p] = 1f;
-                _permanentMultiplier[p] = 1f;
-            }
+                _diceModifiers[p] = new List<IDiceModifier>();
 
             // Two-phase setup: introduce ourselves to the board so abilities can reach the context.
             Board.Bind(this);
@@ -89,15 +79,10 @@ namespace Tavla.Core.Runtime
 
         public int AddScore(int playerId, int amount)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
 
-            // Multipliers are applied here; checkers only send the RAW score (SRP).
-            // Rounded (not truncated) so float error such as 14.9999 never loses a point.
-            double multiplier = (double)_turnMultiplier[playerId] * _permanentMultiplier[playerId];
-            int final = (int)Math.Round(amount * multiplier, MidpointRounding.AwayFromZero);
-
-            _turnScore[playerId] += final;
-            _totalScore[playerId] += final;
+            _turnScore[playerId] += amount;
+            _totalScore[playerId] += amount;
 
             ScoreChanged?.Invoke(playerId, _totalScore[playerId]);
 
@@ -105,25 +90,13 @@ namespace Tavla.Core.Runtime
             // reliable place to let the board check the target. The View has already seen the new score
             // (event above) by the time the match may end.
             Board.NotifyScoreChanged(playerId, _totalScore[playerId]);
-            return final;
-        }
-
-        public void AddScoreMultiplier(int playerId, float multiplier, bool permanent)
-        {
-            ThrowIfInvalidPlayer(playerId);
-
-            if (permanent)
-                _permanentMultiplier[playerId] *= multiplier;
-            else
-                _turnMultiplier[playerId] *= multiplier;
-
-            MultiplierChanged?.Invoke(playerId, _turnMultiplier[playerId] * _permanentMultiplier[playerId]);
+            return amount;
         }
 
         /// <summary>Plunder Cove: takes back the score earned during this turn.</summary>
         public void ResetTurnScore(int playerId)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
 
             _totalScore[playerId] -= _turnScore[playerId];
             _turnScore[playerId] = 0;
@@ -133,7 +106,7 @@ namespace Tavla.Core.Runtime
 
         public int GetScore(int playerId)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
             return _totalScore[playerId];
         }
 
@@ -143,7 +116,7 @@ namespace Tavla.Core.Runtime
 
         public void AddGold(int playerId, int amount)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
 
             _gold[playerId] += amount;
 
@@ -161,26 +134,19 @@ namespace Tavla.Core.Runtime
 
         public int GetGold(int playerId)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
             return _gold[playerId];
         }
 
         public void AddShopDiscount(int amount)
         {
             ShopDiscount += amount;
-            ShopDiscountChanged?.Invoke(ShopDiscount);
         }
 
         public void TriggerLuxuryShop(int playerId)
         {
+            GameState.ThrowIfInvalidPlayer(playerId);
             LuxuryShopPending = true;
-            LuxuryShopTriggered?.Invoke(playerId);
-        }
-
-        /// <summary>Clears the flag after the shop phase has set up the luxury storefront.</summary>
-        public void ConsumeLuxuryShop()
-        {
-            LuxuryShopPending = false;
         }
 
         #endregion
@@ -189,7 +155,7 @@ namespace Tavla.Core.Runtime
 
         public void SkipTurn(int playerId)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
 
             Board.RequestSkipTurn(playerId);
             TurnSkipped?.Invoke(playerId);
@@ -197,30 +163,55 @@ namespace Tavla.Core.Runtime
 
         public void PinNextDie(int playerId, int value)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
             _pinnedDie[playerId] = value;
         }
 
-        /// <summary>Registers permanent dice relics (Twin Winds, Storm Report).</summary>
-        public void RegisterDiceModifier(IDiceModifier modifier)
+        public void RestrictNextRollToOneDie(int playerId)
         {
-            if (modifier != null && !_diceModifiers.Contains(modifier))
-                _diceModifiers.Add(modifier);
+            GameState.ThrowIfInvalidPlayer(playerId);
+            _oneDieNextRoll[playerId] = true;
         }
 
-        public void UnregisterDiceModifier(IDiceModifier modifier)
+        public void RerollRemainingDice(int playerId)
         {
-            _diceModifiers.Remove(modifier);
+            GameState.ThrowIfInvalidPlayer(playerId);
+
+            if (CurrentRoll != null)
+                CurrentRoll.RerollRemaining(() => _roller.RollFace(_diceModifiers[playerId]));
+        }
+
+        public void GrantExtraDie(int playerId)
+        {
+            GameState.ThrowIfInvalidPlayer(playerId);
+
+            if (CurrentRoll != null)
+                CurrentRoll.GrantExtraMove(_roller.RollFace(_diceModifiers[playerId]));
         }
 
         /// <summary>
-        /// Rolls the dice at the start of a turn: the pinned die is applied first, then relics run in order.
+        /// Registers a dice relic of the given player: charms (Twin Winds, Storm Report) and cards (Meridian Shift,
+        /// Cartographer's Cheat, which only act while armed). It applies to that player's rolls only.
+        /// </summary>
+        public void RegisterDiceModifier(int playerId, IDiceModifier modifier)
+        {
+            GameState.ThrowIfInvalidPlayer(playerId);
+
+            if (modifier != null && !_diceModifiers[playerId].Contains(modifier))
+                _diceModifiers[playerId].Add(modifier);
+        }
+
+        /// <summary>
+        /// Rolls the dice at the start of a turn: the player's relics run in priority order, the pinned die
+        /// (Anchor Checker) settles one die and a poisoning (Poisoned Rum) takes the second away. Then the
+        /// player's checkers react to the finished roll (Kraken) — before the View hears of it, so the board
+        /// it redraws already shows their effect.
         /// </summary>
         public DiceRoll RollDice(int playerId)
         {
-            ThrowIfInvalidPlayer(playerId);
+            GameState.ThrowIfInvalidPlayer(playerId);
 
-            CurrentRoll = _roller.Roll(_diceModifiers);
+            CurrentRoll = _roller.Roll(_diceModifiers[playerId]);
 
             // Anchor Checker / Meridian Shift: one die settles on the pinned value.
             if (_pinnedDie[playerId] > 0)
@@ -229,21 +220,21 @@ namespace Tavla.Core.Runtime
                 _pinnedDie[playerId] = 0;
             }
 
-            // The turn multiplier resets; the permanent multiplier (Siege) is kept.
-            _turnMultiplier[playerId] = 1f;
+            if (_oneDieNextRoll[playerId])
+            {
+                CurrentRoll.DropSecondDie();
+                _oneDieNextRoll[playerId] = false;
+            }
+
+            // Reset before the reactions: score they earn belongs to this turn (Plunder Cove takes it back).
             _turnScore[playerId] = 0;
+
+            Board.NotifyDiceRolled(playerId, CurrentRoll);
 
             DiceRolled?.Invoke(CurrentRoll);
             return CurrentRoll;
         }
 
         #endregion
-
-        private static void ThrowIfInvalidPlayer(int playerId)
-        {
-            if (!GameState.IsValidPlayer(playerId))
-                throw new ArgumentOutOfRangeException(nameof(playerId), playerId,
-                    $"Player id must be in the range 0..{GameState.PlayerCount - 1}.");
-        }
     }
 }

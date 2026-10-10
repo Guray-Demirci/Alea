@@ -1,0 +1,17 @@
+{
+    "name": "Tavla.Sandbox",
+    "rootNamespace": "Tavla.Sandbox",
+    "references": [
+        "Tavla.Core",
+        "Tavla.View"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

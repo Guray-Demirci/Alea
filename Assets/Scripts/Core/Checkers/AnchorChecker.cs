@@ -1,6 +1,5 @@
 using Tavla.Core.Abilities;
 using Tavla.Core.Board;
-using Tavla.Core.Interfaces;
 using Tavla.Core.Runtime;
 
 namespace Tavla.Core.Checkers
@@ -10,22 +9,19 @@ namespace Tavla.Core.Checkers
     /// of points it moved. Removes luck entirely."
     /// The only checker that touches the dice system; the bridge is <see cref="IMatchContext.PinNextDie"/>.
     /// </summary>
-    public class AnchorChecker : BaseChecker, IMoveReactor, IPermanent
+    public class AnchorChecker : SpecialChecker, IMoveReactor
     {
         public const string Id = "checker_anchor";
-
-        public override string TypeId => Id;
 
         public void OnMoveCompleted(IMatchContext context, MoveResult result, bool isMover)
         {
             if (!isMover)
                 return;
 
-            int distance = result.ToIndex - result.FromIndex;
-            if (distance < 0)
-                distance = -distance;
+            // Measured by the rules engine from the real origin, so entering from the bar counts too.
+            int distance = result.Distance;
 
-            // Do not pin an invalid value in edge cases such as entering from the bar.
+            // A die cannot show more than 6 — e.g. a distance stretched by another ability is not pinned.
             if (distance < 1 || distance > GameState.MaxDieValue)
                 return;
 
@@ -33,13 +29,6 @@ namespace Tavla.Core.Checkers
             context.Board.ReportAbility(AbilityIds.AnchorPin, this, result.ToIndex);
         }
 
-        public string ItemId => Id;
-        public string DisplayName => "Anchor Checker";
-        public int Price => 620;
-
-        /// <summary>More than one copy of this checker can be put in the deck.</summary>
-        public bool AllowsDuplicates => true;
-
-        public AnchorChecker(int ownerId) : base(ownerId) { }
+        public AnchorChecker(int ownerId) : base(ownerId, Id, "Anchor Checker") { }
     }
 }

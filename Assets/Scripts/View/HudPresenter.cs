@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using Tavla.Core.Board;
+using Tavla.Core.Checkers;
 using Tavla.Core.Runtime;
 
 namespace Tavla.View
@@ -23,7 +24,7 @@ namespace Tavla.View
     ///
     /// All player-facing strings are serialized fields so they can be changed (or later fed from a
     /// localization table) without touching code. Keep them within the PixelFont character set
-    /// (A-Z, 0-9 and basic punctuation).
+    /// (printable ASCII; Turkish letters are drawn without their marks).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HudPresenter : MonoBehaviour
@@ -65,7 +66,7 @@ namespace Tavla.View
 
             if (_view == null)
                 Debug.LogError("[View] HudPresenter could not find a HudView — the panel will stay empty. " +
-                               "Add the component to the general_info_scheme prefab or assign the View field.", this);
+                               "Add a HudView to the HUD object or assign the View field.", this);
         }
 
         #region Binding
@@ -91,6 +92,8 @@ namespace Tavla.View
             _board.TurnChanged += HandleTurnChanged;
             _board.TurnCountChanged += HandleTurnCountChanged;
             _board.MoveExecuted += HandleMoveExecuted;
+            _board.CheckerReleased += HandleCheckerReleased;
+            _board.CheckerSacrificed += HandleCheckerSacrificed;
             _board.MatchEnded += HandleMatchEnded;
 
             _context.ScoreChanged += HandleScoreChanged;
@@ -111,6 +114,8 @@ namespace Tavla.View
                 _board.TurnChanged -= HandleTurnChanged;
                 _board.TurnCountChanged -= HandleTurnCountChanged;
                 _board.MoveExecuted -= HandleMoveExecuted;
+                _board.CheckerReleased -= HandleCheckerReleased;
+                _board.CheckerSacrificed -= HandleCheckerSacrificed;
                 _board.MatchEnded -= HandleMatchEnded;
                 _board = null;
             }
@@ -160,6 +165,16 @@ namespace Tavla.View
                 _view.SetField(HudField.Task, text);
         }
 
+        /// <summary>
+        /// Shows gold that is not the bound match's — the run's purse between matches, while the shop is open.
+        /// The next <see cref="Bind"/> shows the match's gold again.
+        /// </summary>
+        public void ShowGold(int gold)
+        {
+            if (_view != null)
+                _view.SetField(HudField.Gold, gold);
+        }
+
         private void RefreshMoves()
         {
             if (_view != null)
@@ -189,6 +204,18 @@ namespace Tavla.View
 
         /// <summary>A move spends a die; the remaining moves change.</summary>
         private void HandleMoveExecuted(MoveResult result)
+        {
+            RefreshMoves();
+        }
+
+        /// <summary>Freeing a locked checker (Swamp) sacrifices a die without moving anything.</summary>
+        private void HandleCheckerReleased(BaseChecker checker, int nodeIndex)
+        {
+            RefreshMoves();
+        }
+
+        /// <summary>Sacrificing a checker for its ability (Second Chance) can add a die.</summary>
+        private void HandleCheckerSacrificed(BaseChecker checker, int nodeIndex)
         {
             RefreshMoves();
         }

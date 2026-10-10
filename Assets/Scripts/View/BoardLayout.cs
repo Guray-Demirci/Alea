@@ -3,7 +3,8 @@ using UnityEngine;
 namespace Tavla.View
 {
     /// <summary>
-    /// VISUAL geometry of the board. Values were measured pixel by pixel from play_game_scheme.aseprite.
+    /// VISUAL geometry of the board. Values match points_scheme.aseprite pixel by pixel: a point is a 12 px
+    /// slot (the width of its highlight outline) with the 10 px triangle centred inside it.
     /// There are no game rules here — only the answer to "where is point 7 on screen?".
     ///
     /// Why a ScriptableObject? So that when the artist changes the triangle spacing nothing has to be
@@ -54,6 +55,11 @@ namespace Tavla.View
                  "the left side belongs to the info panel.")]
         [SerializeField] private int _bearOffCenterX = 298;
         [SerializeField] private int _bearOffWidth = 28;
+
+        [Header("Score marks (Navigator footprints)")]
+        [Tooltip("Pixels from a triangle's tip to the centre of its mark. The mark sits past the tip, in the strip " +
+                 "between the two rows, where no checker stack reaches.")]
+        [SerializeField] private int _markTipOffset = 5;
 
         /// <summary>Number of columns per row (6 points on each side of the bar).</summary>
         private const int ColumnsPerRow = 12;
@@ -118,6 +124,18 @@ namespace Tavla.View
             float py = IsTopRow(nodeIndex)
                 ? _topRowTopY + _triangleHeight * 0.5f
                 : _bottomRowBottomY - _triangleHeight * 0.5f;
+
+            return PixelToWorld(px, py);
+        }
+
+        /// <summary>Centre of a point's score mark: just past the triangle's tip, toward the middle of the board.</summary>
+        public Vector3 GetMarkPosition(int nodeIndex)
+        {
+            float px = GetColumnCenterX(GetColumn(nodeIndex));
+
+            float py = IsTopRow(nodeIndex)
+                ? _topRowTopY + _triangleHeight + _markTipOffset
+                : _bottomRowBottomY - _triangleHeight - _markTipOffset;
 
             return PixelToWorld(px, py);
         }

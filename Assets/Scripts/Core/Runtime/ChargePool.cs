@@ -29,19 +29,5 @@ namespace Tavla.Core.Runtime
             Remaining--;
             return true;
         }
-
-        /// <summary>Recharge in the shop.</summary>
-        public void Refill()
-        {
-            Remaining = Max;
-        }
-
-        /// <summary>Adds charges without exceeding the maximum.</summary>
-        public void Grant(int amount)
-        {
-            Remaining += amount;
-            if (Remaining > Max)
-                Remaining = Max;
-        }
     }
 }

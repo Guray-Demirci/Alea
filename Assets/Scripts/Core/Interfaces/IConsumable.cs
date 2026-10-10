@@ -33,8 +33,5 @@ namespace Tavla.Core.Interfaces
         /// </summary>
         /// <param name="choice">Ignored when <see cref="RequiresChoice"/> is false.</param>
         bool TryActivate(IMatchContext context, int choice);
-
-        /// <summary>Recharge from the shop.</summary>
-        void Refill();
     }
 }

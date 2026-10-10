@@ -10,7 +10,6 @@ namespace Tavla.Core.Relics
     {
         public override string ItemId => "relic_twin_winds";
         public override string DisplayName => "Twin Winds";
-        public override int Price => 400;
 
         public override int Priority => 500;
 

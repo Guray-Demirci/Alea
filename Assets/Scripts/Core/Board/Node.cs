@@ -24,6 +24,9 @@ namespace Tavla.Core.Board
 
         private readonly List<BaseChecker> _checkers = new List<BaseChecker>();
 
+        // Per player: the mark that player has left here (Navigator footprints), or null.
+        private readonly ScoreMark[] _marks = new ScoreMark[GameState.PlayerCount];
+
         public IReadOnlyList<BaseChecker> Checkers => _checkers;
 
         public int CheckerCount => _checkers.Count;
@@ -36,8 +39,6 @@ namespace Tavla.Core.Board
 
         /// <summary>Special tile installed on this point (null if none).</summary>
         public ITileEffect ActiveTile { get; private set; }
-
-        public BaseChecker TopChecker => _checkers.Count == 0 ? null : _checkers[_checkers.Count - 1];
 
         public bool IsEmpty => _checkers.Count == 0;
 
@@ -114,27 +115,8 @@ namespace Tavla.Core.Board
             return !enemy.CanBeCaptured;
         }
 
-        /// <summary>
-        /// Effective checker capacity of this point. The Vortex Checker removes the limit.
-        /// The ability of ANY checker on the point may relax the limit.
-        /// </summary>
-        public int GetStackLimit(int defaultLimit)
-        {
-            int limit = defaultLimit;
-
-            for (int i = 0; i < _checkers.Count; i++)
-            {
-                IStackLimitOverride limitOverride = _checkers[i].GetAbility<IStackLimitOverride>();
-                if (limitOverride == null)
-                    continue;
-
-                int candidate = limitOverride.GetStackLimit(defaultLimit);
-                if (candidate > limit)
-                    limit = candidate;
-            }
-
-            return limit;
-        }
+        /// <summary>The given player's score mark on this point (Navigator footprints); null if none.</summary>
+        public ScoreMark GetMark(int playerId) => _marks[playerId];
 
         #endregion
 
@@ -143,16 +125,6 @@ namespace Tavla.Core.Board
         internal void Push(BaseChecker checker)
         {
             _checkers.Add(checker);
-        }
-
-        internal BaseChecker Pop()
-        {
-            if (_checkers.Count == 0)
-                return null;
-
-            BaseChecker top = _checkers[_checkers.Count - 1];
-            _checkers.RemoveAt(_checkers.Count - 1);
-            return top;
         }
 
         /// <summary>Removes a specific checker (for targeted effects such as Doomsday, Spike Pit, Maelstrom).</summary>
@@ -169,6 +141,11 @@ namespace Tavla.Core.Board
         internal void ClearTile()
         {
             ActiveTile = null;
+        }
+
+        internal void SetMark(int playerId, ScoreMark mark)
+        {
+            _marks[playerId] = mark;
         }
 
         #endregion

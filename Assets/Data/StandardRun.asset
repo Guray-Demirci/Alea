@@ -1,0 +1,153 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2868d394070e4cff93f71f6159d7e09a, type: 3}
+  m_Name: StandardRun
+  m_EditorClassIdentifier: Tavla.View::Tavla.View.RunConfig
+  _startingCheckers: 5
+  _finalStretchTurns: 3
+  _startingGold: 0
+  _winGold: 3
+  _bossWinGold: 5
+  _goldPerUnusedTurn: 1
+  _stages:
+  - Matches:
+    - TargetScore: 100
+      TurnLimit: 10
+      OpponentCheckers: 5
+      IsBoss: 0
+    - TargetScore: 130
+      TurnLimit: 12
+      OpponentCheckers: 6
+      IsBoss: 0
+    - TargetScore: 180
+      TurnLimit: 15
+      OpponentCheckers: 8
+      IsBoss: 1
+    NewTiles: []
+    ShopTierOdds:
+    - 70
+    - 25
+    - 5
+    - 0
+  - Matches:
+    - TargetScore: 210
+      TurnLimit: 17
+      OpponentCheckers: 9
+      IsBoss: 0
+    - TargetScore: 250
+      TurnLimit: 19
+      OpponentCheckers: 10
+      IsBoss: 0
+    - TargetScore: 300
+      TurnLimit: 22
+      OpponentCheckers: 12
+      IsBoss: 1
+    NewTiles: []
+    ShopTierOdds:
+    - 40
+    - 35
+    - 20
+    - 5
+  - Matches:
+    - TargetScore: 340
+      TurnLimit: 24
+      OpponentCheckers: 13
+      IsBoss: 0
+    - TargetScore: 380
+      TurnLimit: 26
+      OpponentCheckers: 14
+      IsBoss: 0
+    - TargetScore: 460
+      TurnLimit: 30
+      OpponentCheckers: 15
+      IsBoss: 1
+    NewTiles: []
+    ShopTierOdds:
+    - 20
+    - 30
+    - 35
+    - 15
+  _shopCheckers:
+  - Checker: 18
+    Tier: 1
+  - Checker: 19
+    Tier: 1
+  - Checker: 20
+    Tier: 1
+  - Checker: 6
+    Tier: 1
+  - Checker: 21
+    Tier: 1
+  - Checker: 22
+    Tier: 1
+  - Checker: 12
+    Tier: 1
+  - Checker: 14
+    Tier: 1
+  - Checker: 23
+    Tier: 1
+  - Checker: 26
+    Tier: 1
+  - Checker: 0
+    Tier: 2
+  - Checker: 2
+    Tier: 2
+  - Checker: 3
+    Tier: 2
+  - Checker: 5
+    Tier: 2
+  - Checker: 24
+    Tier: 2
+  - Checker: 25
+    Tier: 2
+  - Checker: 11
+    Tier: 2
+  - Checker: 10
+    Tier: 2
+  - Checker: 8
+    Tier: 2
+  - Checker: 4
+    Tier: 3
+  - Checker: 27
+    Tier: 3
+  - Checker: 28
+    Tier: 3
+  - Checker: 9
+    Tier: 3
+  - Checker: 13
+    Tier: 3
+  - Checker: 29
+    Tier: 3
+  - Checker: 15
+    Tier: 3
+  - Checker: 16
+    Tier: 4
+  _shopCards:
+  - 0
+  - 1
+  _shopCharms:
+  - 0
+  _maxSpecialCheckers: 5
+  _basicCheckerPrice: 2
+  _tierPrices:
+  - 4
+  - 6
+  - 8
+  - 10
+  _cardPrice: 4
+  _charmPrice: 15
+  _rerollPrices:
+  - 1
+  - 3
+  - 5
+  - 7
+  - 9

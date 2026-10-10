@@ -1,15 +1,15 @@
-using System;
 using Tavla.Core.Abilities;
 
 namespace Tavla.Core.Checkers
 {
     /// <summary>
     /// Common skeleton of every checker on the board. PURE C# — it knows nothing about Unity.
-    /// Intentionally kept "thin": none of the 18 special abilities is ADDED here.
+    /// Intentionally kept "thin": none of the special abilities is ADDED here.
     /// Abilities are attached through composition via <see cref="ICheckerAbility"/> interfaces.
     ///
-    /// The inheritance depth is always 2: BaseChecker -> ConcreteChecker. The chain never grows;
-    /// variety comes from "which interfaces it implements".
+    /// The chain stays short: BaseChecker -> DefaultChecker, or BaseChecker -> <see cref="SpecialChecker"/> -> a
+    /// concrete special checker. SpecialChecker only carries the shop identity; variety comes from "which
+    /// interfaces it implements".
     /// </summary>
     public abstract class BaseChecker
     {
@@ -24,9 +24,6 @@ namespace Tavla.Core.Checkers
         /// i.e. the checker temporarily behaves like a DefaultChecker.
         /// </summary>
         public bool AbilitiesSuppressed { get; private set; }
-
-        /// <summary>Raised when the checker is captured (for View animations).</summary>
-        public event Action<BaseChecker> Captured;
 
         protected BaseChecker(int ownerId)
         {
@@ -66,11 +63,11 @@ namespace Tavla.Core.Checkers
             }
         }
 
-        /// <summary>Called by GameState at the MOMENT the checker is captured.</summary>
-        public virtual void OnCaptured(int capturedByPlayerId)
-        {
-            Captured?.Invoke(this);
-        }
+        /// <summary>
+        /// Do special tiles act on this checker? Not on one immune to them (Reckless). GameState asks this before
+        /// every per-checker tile hook, so tiles never see such a checker at all.
+        /// </summary>
+        public bool IsAffectedByTiles => GetAbility<ITileImmunity>() == null;
 
         /// <summary>Helper: is this checker an enemy of the given player?</summary>
         public bool IsEnemyOf(int playerId) => OwnerId != playerId;

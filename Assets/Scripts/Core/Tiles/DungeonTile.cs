@@ -7,8 +7,11 @@ namespace Tavla.Core.Tiles
 {
     /// <summary>
     /// Dungeon Tile (Iron Cage). Open/close cycle:
-    ///   Closed turn: checkers inside cannot move, no checker can enter, no point can be made.
-    ///   Open turn  : the point behaves completely normally.
+    ///   Closed round: checkers inside cannot move, no checker can enter, no point can be made.
+    ///   Open round  : the point behaves completely normally.
+    /// The cycle runs per ROUND, not per turn: flipping on every turn would show one player the cage
+    /// always closed and the other always open. Per round, each player sees it closed on one turn
+    /// and open on the next.
     /// The only tile that overrides all three permission queries — it is the reason the hook set
     /// is so fine-grained.
     /// </summary>
@@ -32,7 +35,7 @@ namespace Tavla.Core.Tiles
 
         public override bool AllowsBlockade => !IsClosed;
 
-        public override void OnTurnPassed(IMatchContext context, Node node)
+        public override void OnRoundPassed(IMatchContext context, Node node)
         {
             IsClosed = !IsClosed;
             context.Board.ReportAbility(IsClosed ? AbilityIds.DungeonClosed : AbilityIds.DungeonOpened,

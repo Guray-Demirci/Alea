@@ -21,7 +21,6 @@ namespace Tavla.Core.Relics
 
         public abstract string ItemId { get; }
         public abstract string DisplayName { get; }
-        public abstract int Price { get; }
 
         public virtual int Priority => DefaultPriority;
         public virtual bool IsActive => true;

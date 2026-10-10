@@ -62,9 +62,7 @@ namespace Tavla.Core.Board
                 throw new ArgumentOutOfRangeException(nameof(finalStretchTurns), finalStretchTurns,
                     "The final stretch cannot be negative; use 0 to end the match instead.");
 
-            if (!GameState.IsValidPlayer(scoringPlayerId))
-                throw new ArgumentOutOfRangeException(nameof(scoringPlayerId), scoringPlayerId,
-                    $"Player id must be in the range 0..{GameState.PlayerCount - 1}.");
+            GameState.ThrowIfInvalidPlayer(scoringPlayerId, nameof(scoringPlayerId));
 
             return new MatchRules(turnLimit, targetScore, scoringPlayerId, finalStretchTurns);
         }

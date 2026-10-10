@@ -15,7 +15,7 @@ namespace Tavla.Core.Board
         InvalidDistance,    // Distance is outside the 1-6 range
         NoDiceValue,        // No die covers this distance
         DestinationBlocked, // Destination is held by the opponent
-        StackFull,          // Point capacity reached (default 5; the Vortex Checker removes the limit)
+        StackFull,          // Point capacity reached (GameState.StackLimit)
         BlockedByTile,      // A special tile on the destination blocked entry (Dungeon)
         CheckerLocked,      // Checker is locked on its point (Swamp / Dungeon)
         MustEnterFromBar,   // A normal move is not allowed while a checker is on the bar
@@ -41,6 +41,14 @@ namespace Tavla.Core.Board
         public readonly int ToIndex;
         public readonly int PlayerId;
 
+        /// <summary>
+        /// Points the checker travelled, measured from its real origin — the bar origin when it entered
+        /// from the bar, which <see cref="FromIndex"/> (<see cref="GameState.BarIndex"/>) cannot express.
+        /// Includes the Nomad Checker's bonus. For a bear-off it is the distance that was left to the edge
+        /// of the board. 0 for a failed move.
+        /// </summary>
+        public readonly int Distance;
+
         /// <summary>The checker that moved (may be null for a failed move).</summary>
         public readonly BaseChecker MovedChecker;
 
@@ -57,7 +65,7 @@ namespace Tavla.Core.Board
         public readonly bool WasBearOff;
 
         /// <summary>
-        /// Score this move earned for the player — the value AFTER multipliers are applied.
+        /// Score this move earned for the player — the value actually written to the context.
         /// It is the sum of capture and bear-off points. For the authoritative total listen to
         /// <c>MatchContext.ScoreChanged</c>; this value only answers "what did this move earn?".
         /// </summary>
@@ -65,7 +73,7 @@ namespace Tavla.Core.Board
 
         public bool HasCapture => CapturedCheckers.Count > 0;
 
-        private MoveResult(bool success, MoveError error, int from, int to, int playerId,
+        private MoveResult(bool success, MoveError error, int from, int to, int distance, int playerId,
                            BaseChecker moved, IReadOnlyList<BaseChecker> captured,
                            bool infiltration, bool bearOff, int scoreGained)
         {
@@ -73,6 +81,7 @@ namespace Tavla.Core.Board
             Error = error;
             FromIndex = from;
             ToIndex = to;
+            Distance = distance;
             PlayerId = playerId;
             MovedChecker = moved;
             CapturedCheckers = captured ?? Array.Empty<BaseChecker>();
@@ -82,22 +91,22 @@ namespace Tavla.Core.Board
         }
 
         /// <summary>Successful move on the board.</summary>
-        public static MoveResult Ok(int from, int to, int playerId, BaseChecker moved,
+        public static MoveResult Ok(int from, int to, int distance, int playerId, BaseChecker moved,
                                     IReadOnlyList<BaseChecker> captured, bool infiltration,
                                     int scoreGained)
-            => new MoveResult(true, MoveError.None, from, to, playerId, moved, captured,
+            => new MoveResult(true, MoveError.None, from, to, distance, playerId, moved, captured,
                               infiltration, false, scoreGained);
 
         /// <summary>
         /// Successful bear-off. The destination is not a point, so <see cref="ToIndex"/> holds a
         /// sentinel value and the capture list is always empty.
         /// </summary>
-        public static MoveResult BearOff(int from, int toSentinel, int playerId,
+        public static MoveResult BearOff(int from, int toSentinel, int distance, int playerId,
                                          BaseChecker moved, int scoreGained)
-            => new MoveResult(true, MoveError.None, from, toSentinel, playerId, moved, null,
+            => new MoveResult(true, MoveError.None, from, toSentinel, distance, playerId, moved, null,
                               false, true, scoreGained);
 
         public static MoveResult Fail(MoveError error, int from, int to, int playerId)
-            => new MoveResult(false, error, from, to, playerId, null, null, false, false, 0);
+            => new MoveResult(false, error, from, to, 0, playerId, null, null, false, false, 0);
     }
 }

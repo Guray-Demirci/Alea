@@ -4,7 +4,7 @@ namespace Tavla.Core.Runtime
     /// Abstraction of the randomness source. Most designed checkers rely on chances such as 50%/25%.
     /// UnityEngine.Random CANNOT be used (Core is pure C#). The abstraction also lets tests plug in a
     /// fixed-seed (deterministic) provider and reliably answer questions like
-    /// "does the Bouncer really hit 50% of the time?".
+    /// "does the Clover really hit 50% of the time?".
     /// </summary>
     public interface IRandomProvider
     {

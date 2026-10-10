@@ -23,6 +23,32 @@ namespace Tavla.Core.Runtime
 
         public DiceRoll Roll(IList<IDiceModifier> modifiers)
         {
+            // 1) BEFORE the roll: shape the die faces.
+            PrepareFaces(modifiers);
+
+            // 2) The roll.
+            DiceRoll roll = new DiceRoll();
+            roll.Set(RollPreparedFace(), RollPreparedFace());
+
+            // 3) AFTER the roll: interpret the result.
+            for (int i = 0; i < _sorted.Count; i++)
+                _sorted[i].ModifyRoll(roll, _random);
+
+            return roll;
+        }
+
+        /// <summary>
+        /// One extra die, for abilities that roll again mid-turn (Dice Holder, Second Chance). The relics still
+        /// shape its faces, but nothing interprets a single die the way a pair is interpreted.
+        /// </summary>
+        public int RollFace(IList<IDiceModifier> modifiers)
+        {
+            PrepareFaces(modifiers);
+            return RollPreparedFace();
+        }
+
+        private void PrepareFaces(IList<IDiceModifier> modifiers)
+        {
             // Sort active relics by priority (on every roll: a relic may have been used up).
             _sorted.Clear();
             if (modifiers != null)
@@ -35,7 +61,6 @@ namespace Tavla.Core.Runtime
                 _sorted.Sort((a, b) => a.Priority.CompareTo(b.Priority));
             }
 
-            // 1) BEFORE the roll: shape the die faces.
             _faces.Clear();
             _faces.AddRange(StandardFaces);
             for (int i = 0; i < _sorted.Count; i++)
@@ -43,16 +68,8 @@ namespace Tavla.Core.Runtime
 
             if (_faces.Count == 0)
                 _faces.AddRange(StandardFaces); // Safety: fall back to standard if every face was removed.
-
-            // 2) The roll.
-            DiceRoll roll = new DiceRoll();
-            roll.Set(_faces[_random.Range(0, _faces.Count)], _faces[_random.Range(0, _faces.Count)]);
-
-            // 3) AFTER the roll: interpret the result.
-            for (int i = 0; i < _sorted.Count; i++)
-                _sorted[i].ModifyRoll(roll, _random);
-
-            return roll;
         }
+
+        private int RollPreparedFace() => _faces[_random.Range(0, _faces.Count)];
     }
 }

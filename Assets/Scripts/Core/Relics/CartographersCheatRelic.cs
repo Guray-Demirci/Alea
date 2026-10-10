@@ -11,7 +11,6 @@ namespace Tavla.Core.Relics
     {
         public override string ItemId => "relic_cartographers_cheat";
         public override string DisplayName => "Cartographer's Cheat";
-        public override int Price => 220;
 
         /// <summary>Must enable the mode AFTER other relics have decided the result.</summary>
         public override int Priority => 950;

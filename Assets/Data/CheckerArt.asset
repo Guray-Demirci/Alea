@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 523718b71eea033d29f3e91f852bac5f, type: 3}
+  m_Name: CheckerArt
+  m_EditorClassIdentifier: Tavla.View::Tavla.View.CheckerArtSet
+  _movableRing: {fileID: 21300000, guid: 4e6a8d6b24e5406eaf7b679e9736733a, type: 3}
+  _selectedRing: {fileID: 21300000, guid: 97734ceed3be43ba9bebd7d76981353b, type: 3}
+  _checkers:
+  - Checker: 0
+    Sprite: {fileID: 21300000, guid: 44aaedc4a4bc4275974dd73d21bd3bce, type: 3}
+  - Checker: 2
+    Sprite: {fileID: 21300000, guid: c60af19b76904a4e9f56a7edb9f2b8aa, type: 3}
+  - Checker: 3
+    Sprite: {fileID: 21300000, guid: a1ce3ca30bfa4657bf2049b2d4bb8de9, type: 3}
+  - Checker: 4
+    Sprite: {fileID: 21300000, guid: a7d22d65e10f4627bf1a8f9af30c6185, type: 3}
+  - Checker: 5
+    Sprite: {fileID: 21300000, guid: 35d7fb62b5614141bb53a7ee76c347af, type: 3}
+  - Checker: 6
+    Sprite: {fileID: 21300000, guid: d843e2cdc805459f83189a69f5910330, type: 3}
+  - Checker: 8
+    Sprite: {fileID: 21300000, guid: bbeeea8d00334870b129bff262abb19b, type: 3}
+  - Checker: 9
+    Sprite: {fileID: 21300000, guid: c7105cc34eb84f29acee14c906f469fb, type: 3}
+  - Checker: 10
+    Sprite: {fileID: 21300000, guid: 845050d656ad498d8e26b7b238298b31, type: 3}
+  - Checker: 11
+    Sprite: {fileID: 21300000, guid: 2a17d07f5dc74f1f9050ce618fb58528, type: 3}
+  - Checker: 12
+    Sprite: {fileID: 21300000, guid: bff193a800fe434e935806509a8ed4fd, type: 3}
+  - Checker: 13
+    Sprite: {fileID: 21300000, guid: a2eadebdb5b840e6b0319d3986212350, type: 3}
+  - Checker: 14
+    Sprite: {fileID: 21300000, guid: e49a2ed4fbb246d9bdad521cf9d91138, type: 3}
+  - Checker: 15
+    Sprite: {fileID: 21300000, guid: 8ccdd898c61d453da2a3441d6d491671, type: 3}
+  - Checker: 16
+    Sprite: {fileID: 21300000, guid: 15a9adc23e6e4900bb0bcd86f4fa78ce, type: 3}
+  - Checker: 18
+    Sprite: {fileID: 21300000, guid: 92ee2ccc957041d9b269359de8cf1a8d, type: 3}
+  - Checker: 19
+    Sprite: {fileID: 21300000, guid: 859590930a8845db94a1ddb168db357d, type: 3}
+  - Checker: 20
+    Sprite: {fileID: 21300000, guid: 802da06b7fb74256b43bd28e36f9e9c2, type: 3}
+  - Checker: 21
+    Sprite: {fileID: 21300000, guid: 8eb9fcb0ae694e67b512e7b0d4f210aa, type: 3}
+  - Checker: 22
+    Sprite: {fileID: 21300000, guid: 6771f1b474584ee49fcc59d0ead74b7c, type: 3}
+  - Checker: 23
+    Sprite: {fileID: 21300000, guid: 9ca25d16ecbe450cb0e0af7b06835139, type: 3}
+  - Checker: 24
+    Sprite: {fileID: 21300000, guid: e7ab25218e034e25bbf13bda8c8a85b6, type: 3}
+  - Checker: 25
+    Sprite: {fileID: 21300000, guid: 8c14de2279b54e198138037e9d902c07, type: 3}
+  - Checker: 26
+    Sprite: {fileID: 21300000, guid: a58031eb01c942f0993588f743dc308b, type: 3}
+  - Checker: 27
+    Sprite: {fileID: 21300000, guid: d87693bb266446558b7a216c2ec56cf8, type: 3}
+  - Checker: 28
+    Sprite: {fileID: 21300000, guid: 8c1b93e41f134049a6221baa42c35f47, type: 3}
+  - Checker: 29
+    Sprite: {fileID: 21300000, guid: ac2cb183667e4f5eb260af52abb505a8, type: 3}
