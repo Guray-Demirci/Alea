@@ -41,6 +41,7 @@ namespace Tavla.View.Tests
 
                 Assert.AreNotSame(tile, create(), $"{kind}: tiles keep per-match state, so every match needs its own.");
                 Assert.IsTrue(effectIds.Add(tile.EffectId), $"{kind} shares the effect id {tile.EffectId}.");
+                Assert.AreEqual(tile.EffectId, TileCatalog.GetEffectId(kind), kind.ToString());
             }
         }
 

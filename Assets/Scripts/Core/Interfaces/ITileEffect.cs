@@ -12,14 +12,15 @@ namespace Tavla.Core.Interfaces
     ///   CanLandOn            -> Dungeon (no entry while closed)
     ///   CanLeaveFrom         -> Swamp (stuck checkers cannot leave), Dungeon (locked turn)
     ///   AllowsBlockade       -> Dungeon (no point can be made while closed)
-    ///   OnCheckerLanded      -> Spike Pit, Maelstrom, Swamp, Fog, Toll Booth, Powder Keg
-    ///   OnCheckerLeft        -> Fog (restore abilities), Powder Keg (stop the fuse)
+    ///   OnCheckerLanded      -> Spike Pit, Maelstrom, Swamp, Fog, Toll Booth
+    ///   OnCheckerLeft        -> Fog (restore abilities)
     ///   OnCheckerPassedOver  -> Toll Booth ("every checker that passes or sits here")
-    ///   OnTurnPassed         -> Powder Keg (the owner's countdown), Swamp, Plunder Cove
+    ///   OnTurnPassed         -> Powder Keg (the point's countdown), Swamp, Plunder Cove
     ///   OnRoundPassed        -> Dungeon (open/close — per round, so both players see both states)
     ///
     /// Optional capabilities live in their own interfaces so tiles without them carry no extra members:
     ///   <see cref="IReleasableLock"/> -> Swamp (a die can be sacrificed to free a stuck checker)
+    ///   <see cref="ICountdownTile"/>  -> Powder Keg (the View shows its count)
     ///
     /// A checker immune to tiles (Reckless) never reaches the per-checker hooks: GameState filters it out through
     /// <see cref="BaseChecker.IsAffectedByTiles"/>. Only a hook that walks the point's checkers itself

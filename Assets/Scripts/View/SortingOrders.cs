@@ -4,7 +4,8 @@ namespace Tavla.View
     /// Every sorting order used by the View, in one place.
     ///
     /// The layers are relative to each other
-    /// (background &lt; board &lt; points &lt; marks &lt; tray &lt; highlight &lt; checkers &lt; bar &lt; HUD),
+    /// (background &lt; board &lt; points &lt; tiles &lt; dice cards &lt; marks &lt; tray &lt; highlight &lt; checkers &lt;
+    /// tile counts &lt; bar &lt; HUD),
     /// so scattering the numbers across files made it easy to break the stacking by editing one of them.
     /// Values that are also exposed in the Inspector use these constants as their defaults.
     /// </summary>
@@ -19,6 +20,15 @@ namespace Tavla.View
         /// <summary>The 24 points (triangles), drawn on the board.</summary>
         public const int BoardPoints = -90;
 
+        /// <summary>Tiles, each drawn over its whole point: above the points, below everything that lies on them.</summary>
+        public const int Tiles = -88;
+
+        /// <summary>
+        /// The dice cards in the strip between the two rows: above the points, below the marks, which reach into the
+        /// strip over the cards' ends and must stay whole.
+        /// </summary>
+        public const int DiceCards = -85;
+
         /// <summary>Score marks past the points' tips (Navigator footprints): above the points, below the tray.</summary>
         public const int PointMark = -80;
 
@@ -30,6 +40,12 @@ namespace Tavla.View
 
         /// <summary>Checkers on a point; the stack index is added on top.</summary>
         public const int CheckerBase = 10;
+
+        /// <summary>
+        /// A tile's countdown near its point's tip (Powder Keg): above the checkers stacked on the point, so a full
+        /// stack never hides it; below a checker being dragged.
+        /// </summary>
+        public const int TileCount = 100;
 
         /// <summary>Checkers on the bar; the stack index is added on top.</summary>
         public const int BarCheckerBase = 200;

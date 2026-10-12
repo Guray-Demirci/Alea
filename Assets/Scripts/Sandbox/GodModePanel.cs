@@ -462,6 +462,10 @@ namespace Tavla.Sandbox
             if (node.ActiveTile != null)
                 text += $"  {node.ActiveTile.EffectId}";
 
+            ICountdownTile countdown = node.ActiveTile as ICountdownTile;
+            if (countdown != null)
+                text += $" (goes off in {countdown.Countdown})";
+
             if (node.GetMark(SandboxMatchFactory.PlayerId) != null)
                 text += "  (marked)";
 

@@ -30,6 +30,13 @@ namespace Tavla.View
             }
         }
 
+        /// <summary>The <see cref="ITileEffect.EffectId"/> of this kind's tiles, which is how the board knows them.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The kind has no tile class.</exception>
+        public static string GetEffectId(TileKind kind)
+        {
+            return GetFactory(kind)().EffectId;
+        }
+
         /// <summary>A tile of this kind on the given point.</summary>
         /// <exception cref="ArgumentOutOfRangeException">The kind has no tile class, or the point is off the board.</exception>
         public static TilePlacement CreatePlacement(TileKind kind, int point)

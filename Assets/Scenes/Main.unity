@@ -172,6 +172,8 @@ MonoBehaviour:
   _player0Color: {r: 1, g: 1, b: 1, a: 1}
   _player1Color: {r: 0.15, g: 0.15, b: 0.18, a: 1}
   _bearOffTrayColor: {r: 1, g: 1, b: 1, a: 0.08}
+  _diceCardArt: {fileID: 11400000, guid: 19deb8094df24afa90fb45e51a674b92, type: 2}
+  _tileArt: {fileID: 11400000, guid: af7271c253ee86c9be3c0c39e0ef7ce9, type: 2}
   _hud: {fileID: 0}
   _configureCamera: 1
   _cameraBackgroundColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}

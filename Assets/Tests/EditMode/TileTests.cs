@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using Tavla.Core.AI;
 using Tavla.Core.Board;
@@ -45,33 +46,62 @@ namespace Tavla.Core.Tests
         }
 
         [Test]
-        public void PowderKeg_OnlyTheOwnersTurnsBurnTheFuse()
+        public void PowderKeg_CountsDownOnEveryTurn_AndStartsAgainAfterTheBlast()
         {
             MatchContext context;
             GameState state = TestBoard.CreateEmpty(out context);
             PowderKegTile keg = new PowderKegTile();
             state.PlaceTile(3, keg);
-            DefaultChecker checker = TestBoard.PlaceDefault(state, 0, 0);
-            TestBoard.PlaceDefault(state, 10, 0); // Keeps player 0 in the match after the explosion.
-            TestBoard.SetDice(context, 3, 5);
-            Assert.IsTrue(state.TryMove(0, 3));
 
-            state.EndTurn(); // Player 0's first turn ends.
-            Assert.AreEqual(2, keg.GetRemainingFuse(checker));
+            // Turn order: player 0, player 1, player 0, player 1. Nobody stands on it; the point counts anyway.
+            int[] countOnTurn = new int[4];
+            for (int turn = 0; turn < countOnTurn.Length; turn++)
+            {
+                countOnTurn[turn] = keg.Countdown;
+                state.EndTurn();
+            }
 
-            state.EndTurn(); // Player 1's turn does not burn it.
-            Assert.AreEqual(2, keg.GetRemainingFuse(checker));
+            CollectionAssert.AreEqual(new[] { 3, 2, 1, 3 }, countOnTurn);
+        }
 
-            state.EndTurn(); // Player 0's second turn.
+        [Test]
+        public void PowderKeg_WhenTheCountRunsOut_DestroysEveryCheckerOnItForGood()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(3, new PowderKegTile());
+            DefaultChecker mine = TestBoard.PlaceDefault(state, 3, 0);
+            DefaultChecker mine2 = TestBoard.PlaceDefault(state, 3, 0);
+            TestBoard.PlaceDefault(state, 10, 0); // Keeps player 0 in the match after the blast.
+            TestBoard.PlaceDefault(state, 20, 1);
+
+            List<BaseChecker> lost = new List<BaseChecker>();
+            state.CheckerLostForGood += (destroyed, point) => lost.Add(destroyed);
+
             state.EndTurn();
-            Assert.AreEqual(1, keg.GetRemainingFuse(checker));
+            state.EndTurn();
+            Assert.AreEqual(2, state.Nodes[3].CheckerCount, "Two turns in, the count has not run out.");
 
-            BaseChecker lost = null;
-            state.CheckerLostForGood += (destroyed, point) => lost = destroyed;
+            state.EndTurn(); // The third turn ends: the keg blows up.
+            Assert.IsTrue(state.Nodes[3].IsEmpty);
+            CollectionAssert.AreEquivalent(new[] { mine, mine2 }, lost, "Lost for good: in a run they leave the deck.");
+            Assert.AreEqual(0, state.GetBarCount(0), "Not even the bar.");
+        }
 
-            state.EndTurn(); // Player 0's third turn: the keg explodes.
-            Assert.AreEqual(GameState.InvalidIndex, state.FindNodeIndexOf(checker));
-            Assert.AreSame(checker, lost, "Lost for good: in a run it leaves the deck.");
+        [Test]
+        public void PowderKeg_SparesACheckerImmuneToTiles()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(3, new PowderKegTile());
+            RecklessChecker reckless = TestBoard.Place(state, 3, new RecklessChecker(0));
+            DefaultChecker plain = TestBoard.PlaceDefault(state, 3, 0);
+
+            for (int turn = 0; turn < PowderKegTile.FuseTurns; turn++)
+                state.EndTurn();
+
+            Assert.AreEqual(3, state.FindNodeIndexOf(reckless));
+            Assert.AreEqual(GameState.InvalidIndex, state.FindNodeIndexOf(plain));
         }
 
         [Test]

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Tavla.View
@@ -61,9 +62,30 @@ namespace Tavla.View
                  "between the two rows, where no checker stack reaches.")]
         [SerializeField] private int _markTipOffset = 5;
 
+        [Header("Dice cards")]
+        [Tooltip("Width of an upright dice card. The 26 px tall card fits the 32 px strip between the two rows.")]
+        [SerializeField] private int _diceCardWidth = 17;
+        [Tooltip("Gap between two dice cards on the same side of the bar.")]
+        [SerializeField] private int _diceCardGap = 14;
+        [Tooltip("Space between each trio of dice cards and the bar side of its points. With the defaults a trio " +
+                 "(3 x 17 + 2 x 14 = 79 px) sits in its side's 82 px of points, 1 px from the bar end and 2 px from " +
+                 "the outer end.")]
+        [SerializeField] private int _diceCardBarMargin = 1;
+
+        [Header("Tile countdown (Powder Keg)")]
+        [Tooltip("Size of the badge that shows a tile's countdown inside its triangle, near the tip. Even width: the " +
+                 "badge is centred on the column, whose centre falls between two pixels.")]
+        [SerializeField] private Vector2Int _tileCountSize = new Vector2Int(6, 7);
+        [Tooltip("Pixels between the badge and the triangle's tip. With the defaults up to four stacked checkers leave " +
+                 "the badge clear.")]
+        [SerializeField] private int _tileCountTipInset = 2;
+
         /// <summary>Number of columns per row (6 points on each side of the bar).</summary>
         private const int ColumnsPerRow = 12;
         private const int ColumnsPerQuadrant = 6;
+
+        /// <summary>The dice cards lie in two trios, one on each side of the bar.</summary>
+        public const int DiceCardsPerSide = 3;
 
         /// <summary>
         /// Creates an in-memory layout with the default values. The caller owns the instance and
@@ -109,11 +131,26 @@ namespace Tavla.View
         public int GetColumn(int nodeIndex) =>
             nodeIndex < ColumnsPerRow ? nodeIndex : (2 * ColumnsPerRow - 1) - nodeIndex;
 
-        /// <summary>Horizontal centre of a column in pixels. The bar gap is built into the formula.</summary>
+        /// <summary>
+        /// Is the point one of points.png's light triangles rather than a dark one? The colours alternate along each
+        /// row, the top row starting light on the left, and across the board each point faces one of the other colour.
+        /// </summary>
+        public bool IsLightPoint(int nodeIndex)
+        {
+            bool evenColumn = GetColumn(nodeIndex) % 2 == 0;
+            return IsTopRow(nodeIndex) ? evenColumn : !evenColumn;
+        }
+
+        /// <summary>Left edge of a column in pixels. The bar gap is built into the formula.</summary>
+        private int GetColumnLeftX(int column)
+        {
+            return _firstTriangleX + column * _trianglePitch + (column >= ColumnsPerQuadrant ? _barOffset : 0);
+        }
+
+        /// <summary>Horizontal centre of a column in pixels.</summary>
         private float GetColumnCenterX(int column)
         {
-            int left = _firstTriangleX + column * _trianglePitch + (column >= ColumnsPerQuadrant ? _barOffset : 0);
-            return left + _triangleWidth * 0.5f;
+            return GetColumnLeftX(column) + _triangleWidth * 0.5f;
         }
 
         /// <summary>Centre of the triangle — position and collider of the NodeView.</summary>
@@ -136,6 +173,55 @@ namespace Tavla.View
             float py = IsTopRow(nodeIndex)
                 ? _topRowTopY + _triangleHeight + _markTipOffset
                 : _bottomRowBottomY - _triangleHeight - _markTipOffset;
+
+            return PixelToWorld(px, py);
+        }
+
+        /// <summary>Centre of the badge that shows a tile's countdown: inside the triangle, just before its tip.</summary>
+        public Vector3 GetTileCountPosition(int nodeIndex)
+        {
+            float px = GetColumnCenterX(GetColumn(nodeIndex));
+            float fromTip = _tileCountTipInset + _tileCountSize.y * 0.5f;
+
+            float py = IsTopRow(nodeIndex)
+                ? _topRowTopY + _triangleHeight - fromTip
+                : _bottomRowBottomY - _triangleHeight + fromTip;
+
+            return PixelToWorld(px, py);
+        }
+
+        /// <summary>Size of the countdown badge in world units.</summary>
+        public Vector2 GetTileCountSize()
+        {
+            return new Vector2(_tileCountSize.x, _tileCountSize.y) / _pixelsPerUnit;
+        }
+
+        /// <summary>
+        /// The centre of a dice card. The cards stand upright in the strip between the two rows, slots 0-2 left of
+        /// the bar and 3-5 right of it, spread evenly over their side's points and mirrored about the bar, whose gap
+        /// stays free for the hit checkers. With an odd card width the centre falls between pixels, so a sprite
+        /// pivoted on its own centre lands on whole pixels.
+        /// </summary>
+        /// <param name="slot">0-5, left to right.</param>
+        /// <exception cref="ArgumentOutOfRangeException">A slot outside 0-5.</exception>
+        public Vector3 GetDiceCardPosition(int slot)
+        {
+            if (slot < 0 || slot >= 2 * DiceCardsPerSide)
+                throw new ArgumentOutOfRangeException(nameof(slot), slot, "A dice card slot is 0-5.");
+
+            int pitch = _diceCardWidth + _diceCardGap;
+            int trioWidth = DiceCardsPerSide * pitch - _diceCardGap;
+
+            // Each trio is measured from the bar: left of it the trio ends just before the side's last point ends,
+            // right of it, it starts just after the first point starts.
+            int trioLeft = slot < DiceCardsPerSide
+                ? GetColumnLeftX(ColumnsPerQuadrant - 1) + _triangleWidth - _diceCardBarMargin - trioWidth
+                : GetColumnLeftX(ColumnsPerQuadrant) + _diceCardBarMargin;
+
+            float px = trioLeft + (slot % DiceCardsPerSide) * pitch + _diceCardWidth * 0.5f;
+
+            // The top row's tips and the bottom row's tips are equally far from the middle of the board.
+            float py = (_topRowTopY + _bottomRowBottomY) * 0.5f;
 
             return PixelToWorld(px, py);
         }

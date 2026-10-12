@@ -46,8 +46,6 @@ namespace Tavla.Core.Abilities
         public const string DungeonOpened = "DungeonOpened";
         public const string FogEnter = "FogEnter";
         public const string FogExit = "FogExit";
-        public const string FuseLit = "FuseLit";
-        public const string FuseDefused = "FuseDefused";
         public const string KegExploded = "KegExploded";
         public const string MaelstromPull = "MaelstromPull";
         public const string Plundered = "Plundered";

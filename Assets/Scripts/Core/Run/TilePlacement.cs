@@ -7,7 +7,7 @@ namespace Tavla.Core.Run
 {
     /// <summary>
     /// A tile the run puts on a point. It holds a FACTORY rather than a tile: tiles keep per-match state
-    /// (Powder Keg fuses, Swamp locks, the Dungeon's open/closed cycle), so every match must get fresh
+    /// (the Powder Keg's count, Swamp locks, the Dungeon's open/closed cycle), so every match must get fresh
     /// instances. The factory must therefore return a new object on every call.
     /// </summary>
     public sealed class TilePlacement

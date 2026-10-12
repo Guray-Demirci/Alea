@@ -12,6 +12,7 @@ using UnityEngine.InputSystem;
 using Tavla.Core.AI;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
+using Tavla.Core.Interfaces;
 using Tavla.Core.Run;
 using Tavla.Core.Runtime;
 
@@ -92,6 +93,17 @@ namespace Tavla.View
                  "dragging; without this the player would not notice there is a drop zone outside the board.")]
         [SerializeField] private Color _bearOffTrayColor = new Color(1f, 1f, 1f, 0.08f);
 
+        [Header("Dice cards")]
+        [Tooltip("The dice cards' art (Create > Tavla > Dice Card Art): six cards in the middle of the board, the human's " +
+                 "rolled faces turned up; the bot's rolls leave them down. Empty = no cards; the info panel still shows " +
+                 "the dice.")]
+        [SerializeField] private DiceCardArtSet _diceCardArt;
+
+        [Header("Tiles")]
+        [Tooltip("The tiles' art (Create > Tavla > Tile Art): a point carrying a tile is drawn as that tile, and turns into " +
+                 "it when the tile appears. Empty = tiles are not drawn; they still work.")]
+        [SerializeField] private TileArtSet _tileArt;
+
         [Header("Info panel")]
         [Tooltip("Presenter that writes score/gold/moves on the left panel. If empty it is searched for in " +
                  "the scene; if there is none the panel is disabled and the game runs unchanged.")]
@@ -161,6 +173,8 @@ namespace Tavla.View
         private MatchContext _context;
         private RunState _runState;
         private ShopPresenter _shopPresenter;
+        private DiceCardsPresenter _diceCards;
+        private TilesView _tiles;
         private TavlaBot _bot;
         private Coroutine _botRoutine;
         private Coroutine _autoEndRoutine;
@@ -220,8 +234,12 @@ namespace Tavla.View
                 if (_gameState == null)
                     return;
 
-                // Whose checkers light up and who gets the auto-pass both depend on who is human.
+                // Who is human decides whose checkers light up, whose dice the cards show and who gets the auto-pass.
                 RefreshMovableCheckers();
+
+                if (_diceCards != null)
+                    _diceCards.Refresh();
+
                 TryStartBotTurn(_gameState.CurrentPlayerId);
                 ScheduleAutoEndCheck();
             }
@@ -274,6 +292,11 @@ namespace Tavla.View
             SpawnCheckers();
             Subscribe();
             BindHud();
+
+            // Like the HUD, before the first roll so the cards see it.
+            if (_diceCards != null)
+                _diceCards.Bind(_gameState, _context);
+
             RefreshBoard(true);
 
             // Roll the first turn's dice, then start the bot if it is its turn.
@@ -291,6 +314,9 @@ namespace Tavla.View
             CancelAutoEnd();
             ClearHighlights();
             Unsubscribe();
+
+            if (_diceCards != null)
+                _diceCards.Unbind();
 
             // The marks belong to the match that left them.
             for (int i = 0; i < _nodeViews.Count; i++)
@@ -517,8 +543,32 @@ namespace Tavla.View
             // The checkers belong to a match; BeginMatch spawns them.
             _checkerRoot = BoardSceneBuilder.CreateWorldRoot("Checkers");
 
+            if (_diceCardArt != null)
+                BuildDiceCards();
+
+            if (_tileArt != null)
+                BuildTiles();
+
             if (_shopArt != null)
                 BuildShop();
+        }
+
+        /// <summary>The dice cards, built once and bound to every match. Only rolls played by hand turn them up.</summary>
+        private void BuildDiceCards()
+        {
+            if (!_diceCardArt.IsComplete)
+                Debug.LogWarning($"[View] Dice card art '{_diceCardArt.name}' is missing sprites; those cards stay empty.", _diceCardArt);
+
+            _diceCards = new DiceCardsPresenter(DiceCardsView.Create(_diceCardArt, _layout), IsHuman);
+        }
+
+        /// <summary>The tiles over the points, built once; <see cref="RefreshTiles"/> shows each match's own.</summary>
+        private void BuildTiles()
+        {
+            if (!_tileArt.IsComplete)
+                Debug.LogWarning($"[View] Tile art '{_tileArt.name}' is missing sprites; those frames stay empty.", _tileArt);
+
+            _tiles = TilesView.Create(_tileArt, _solidSprite, _layout);
         }
 
         /// <summary>
@@ -660,6 +710,9 @@ namespace Tavla.View
             // Without unsubscribing, Core would keep a reference to a destroyed MonoBehaviour,
             // causing MissingReferenceException and a memory leak on scene changes.
             Unsubscribe();
+
+            if (_diceCards != null)
+                _diceCards.Unbind();
 
             if (_runState != null)
             {
@@ -855,7 +908,30 @@ namespace Tavla.View
             }
 
             RefreshMarks();
+            RefreshTiles();
             RefreshMovableCheckers();
+        }
+
+        /// <summary>
+        /// Shows the tiles on the points. The view remembers what it showed, across matches too, so only a point whose
+        /// tile came or went turns over: a new match of the same stage keeps its tiles still, while the stage that adds
+        /// one, a fresh sandbox deal or a Spike Pit breaking mid-match plays the change. Always animated, even when
+        /// <see cref="RefreshBoard"/> snaps the checkers.
+        /// </summary>
+        private void RefreshTiles()
+        {
+            if (_tiles == null)
+                return;
+
+            for (int i = 0; i < GameState.NodeCount; i++)
+            {
+                ITileEffect tile = _gameState.Nodes[i].ActiveTile;
+                _tiles.Show(i, tile != null ? tile.EffectId : null);
+
+                // A countdown drops as a turn ends, and the next turn's roll redraws the board: always in step.
+                ICountdownTile countdown = tile as ICountdownTile;
+                _tiles.ShowCount(i, countdown != null ? countdown.Countdown : TilesView.NoCount);
+            }
         }
 
         /// <summary>
@@ -962,6 +1038,9 @@ namespace Tavla.View
             StopBotTurn();
             CancelAutoEnd();
             RefreshMovableCheckers();
+
+            // A keg's blast can end the match as a turn ends, with no roll after it to redraw its count.
+            RefreshTiles();
         }
 
         #endregion
@@ -1025,8 +1104,10 @@ namespace Tavla.View
         #region Turn hand-over
 
         /// <summary>Is it a human's turn? With the bot disabled both sides are human.</summary>
-        private bool IsHumanTurn =>
-            !_gameState.IsMatchOver && (_bot == null || _gameState.CurrentPlayerId != _botPlayerId);
+        private bool IsHumanTurn => !_gameState.IsMatchOver && IsHuman(_gameState.CurrentPlayerId);
+
+        /// <summary>Is this seat played by hand right now? With the bot disabled both are.</summary>
+        private bool IsHuman(int playerId) => _bot == null || playerId != _botPlayerId;
 
         /// <summary>
         /// Schedules a check whether the human player still has a move. Called after every move and every

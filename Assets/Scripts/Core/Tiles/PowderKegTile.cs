@@ -2,97 +2,63 @@ using System.Collections.Generic;
 using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
+using Tavla.Core.Interfaces;
 using Tavla.Core.Runtime;
 
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// Powder Keg Tile (minefield). "When a checker steps here a 3-turn countdown starts.
-    /// If you do not move the checker away within 3 turns the keg explodes and the checker is destroyed
-    /// PERMANENTLY (it does not even go to the bar; you have to buy a new checker in the shop)."
-    /// Permanently means the run too: <see cref="GameState.DestroyChecker"/> takes it out of the player's deck.
-    /// The countdown is per checker; every checker on the point has its own fuse.
-    /// Only the OWNER's turns count — they are the only turns in which the checker can be moved away.
-    /// The turn it stepped on is the first of the three, so the owner can still save it on the two turns after.
+    /// Powder Keg Tile (minefield, the red point). "This point keeps counting down from three during the match, and
+    /// when the count runs out it blows up every checker on it. If the match is not over, the count starts again."
+    ///
+    /// The POINT counts, not a checker on it, so the count runs whether or not anyone stands there, and drops at the
+    /// end of every turn, either player's. It shows 3 at the start of the match, blows up at the end of the third turn
+    /// and shows 3 again. A blown-up checker is destroyed PERMANENTLY, as the keg's first design said: not even the
+    /// bar; in a run it leaves the deck too (<see cref="GameState.DestroyChecker"/>). A checker immune to tiles
+    /// (Reckless) shrugs the blast off.
     /// </summary>
-    public class PowderKegTile : BaseTileEffect
+    public class PowderKegTile : BaseTileEffect, ICountdownTile
     {
         public const string Id = "tile_powderkeg";
-        private const int FuseTurns = 3;
 
-        /// <summary>Returned by <see cref="GetRemainingFuse"/> when the checker has no lit fuse.</summary>
-        public const int NoFuse = -1;
+        /// <summary>Turns from a fresh count to the blast.</summary>
+        public const int FuseTurns = 3;
 
-        private readonly Dictionary<BaseChecker, int> _fuses = new Dictionary<BaseChecker, int>();
-
-        // Reused every turn to collect fuse keys without allocating a new list.
-        private readonly List<BaseChecker> _fuseKeys = new List<BaseChecker>();
+        // Reused at every blast to collect the victims without allocating a new list.
+        private readonly List<BaseChecker> _victims = new List<BaseChecker>();
 
         public override string EffectId => Id;
 
-        /// <summary>Remaining turns, so the View can show counter pixels on the tile. <see cref="NoFuse"/> if none.</summary>
-        public int GetRemainingFuse(BaseChecker checker)
-        {
-            int turns;
-            return _fuses.TryGetValue(checker, out turns) ? turns : NoFuse;
-        }
-
-        public override void OnCheckerLanded(IMatchContext context, Node node, BaseChecker checker)
-        {
-            _fuses[checker] = FuseTurns;
-            context.Board.ReportAbility(AbilityIds.FuseLit, checker, node.Index);
-        }
-
-        public override void OnCheckerLeft(IMatchContext context, Node node, BaseChecker checker)
-        {
-            // The checker escaped in time: the countdown is cancelled.
-            if (_fuses.Remove(checker))
-                context.Board.ReportAbility(AbilityIds.FuseDefused, checker, node.Index);
-        }
+        /// <summary>Turn ends left before the blast: 3, 2, 1. The View shows it on the point.</summary>
+        public int Countdown { get; private set; } = FuseTurns;
 
         public override void OnTurnPassed(IMatchContext context, Node node, int endingPlayerId)
         {
-            if (_fuses.Count == 0)
+            Countdown--;
+            if (Countdown > 0)
                 return;
 
-            // The dictionary cannot be modified while iterating -> collect the detonations first.
-            List<BaseChecker> detonated = null;
-            _fuseKeys.Clear();
-            _fuseKeys.AddRange(_fuses.Keys);
+            Countdown = FuseTurns;
+            Explode(context, node);
+        }
 
-            for (int i = 0; i < _fuseKeys.Count; i++)
+        private void Explode(IMatchContext context, Node node)
+        {
+            context.Board.ReportAbility(AbilityIds.KegExploded, null, node.Index);
+
+            // The stack cannot change while it is walked -> collect the victims first.
+            _victims.Clear();
+            for (int i = 0; i < node.CheckerCount; i++)
             {
-                BaseChecker checker = _fuseKeys[i];
-
-                // The opponent's turn does not burn the owner's fuse.
-                if (checker.OwnerId != endingPlayerId)
-                    continue;
-
-                int remaining = _fuses[checker] - 1;
-
-                if (remaining > 0)
-                {
-                    _fuses[checker] = remaining;
-                    continue;
-                }
-
-                if (detonated == null)
-                    detonated = new List<BaseChecker>();
-
-                detonated.Add(checker);
+                if (node.Checkers[i].IsAffectedByTiles)
+                    _victims.Add(node.Checkers[i]);
             }
 
-            if (detonated == null)
-                return;
+            // A checker's loss can end the match; nothing may change on the board after that.
+            for (int i = 0; i < _victims.Count && !context.Board.IsMatchOver; i++)
+                context.Board.DestroyChecker(_victims[i], node.Index);
 
-            for (int i = 0; i < detonated.Count; i++)
-            {
-                _fuses.Remove(detonated[i]);
-                context.Board.ReportAbility(AbilityIds.KegExploded, detonated[i], node.Index);
-
-                // Not even the bar: removed from the game entirely.
-                context.Board.DestroyChecker(detonated[i], node.Index);
-            }
+            _victims.Clear();
         }
     }
 }

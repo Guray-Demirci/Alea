@@ -133,7 +133,7 @@ namespace Tavla.Core.Board
 
         /// <summary>
         /// The ONLY way to remove a checker from a point. Calling <see cref="Node.Remove"/> directly is
-        /// NOT ALLOWED: tiles keep per-checker state (Fog ability lock, Swamp lock, Powder Keg fuse)
+        /// NOT ALLOWED: tiles keep per-checker state (Fog ability lock, Swamp lock)
         /// and only OnCheckerLeft clears it. Any exit path that skips the hook leaves the checker
         /// fogged/stuck forever and accumulates dead references in the tile's dictionary.
         /// </summary>
@@ -390,7 +390,7 @@ namespace Tavla.Core.Board
         internal void DestroyChecker(BaseChecker checker, int nodeIndex)
         {
             // The hook must run even when the checker is destroyed: otherwise per-checker tile records
-            // (Swamp lock, Powder Keg fuse) would keep dead references.
+            // (Swamp lock, Fog ability lock) would keep dead references.
             if (!IsOnBoard(nodeIndex) || !RemoveFromNode(_nodes[nodeIndex], checker))
                 return;
 

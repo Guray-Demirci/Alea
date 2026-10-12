@@ -65,6 +65,8 @@ namespace Tavla.View.Tests
                 AssertReferences(board, "_run", DataAssetTests.StandardRunPath);
                 AssertReferences(board, "_shopArt", DataAssetTests.ShopArtPath);
                 AssertReferences(board, "_checkerArt", DataAssetTests.CheckerArtPath);
+                AssertReferences(board, "_diceCardArt", DataAssetTests.DiceCardArtPath);
+                AssertReferences(board, "_tileArt", DataAssetTests.TileArtPath);
             });
         }
 
@@ -77,6 +79,8 @@ namespace Tavla.View.Tests
 
                 Assert.IsNull(board.FindProperty("_run").objectReferenceValue);
                 AssertReferences(board, "_checkerArt", DataAssetTests.CheckerArtPath);
+                AssertReferences(board, "_diceCardArt", DataAssetTests.DiceCardArtPath);
+                AssertReferences(board, "_tileArt", DataAssetTests.TileArtPath);
             });
         }
 

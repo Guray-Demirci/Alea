@@ -52,6 +52,23 @@ Key rules of the design:
   `board.png` and `points.png`, the 24 triangles. While a checker is dragged, every legal point shows
   `point_highlight.png` around itself, mirrored on the bottom row. Both point sprites are exported from
   `points_scheme.aseprite`, whose columns match `BoardLayout` pixel by pixel.
+- **The dice are cards.** Six upright cards, one per die face, stand spread across the middle of the board,
+  three on each side of the bar (`Assets/Data/DiceCardArt.asset`; sprites in `Assets/Sprites/Dice`).
+  `DiceCardFaces` decides what each shows: a die in hand turns up its own card, a double turns up the middle four,
+  and a spent die's card turns back down. `DiceCardsView` plays the artist's flip (`1kartanimasyon` to
+  `6kartanimasyon`, faster than drawn: the asset's frame time) forwards to turn a card up and backwards to turn it
+  down, and `DiceCardsPresenter` connects the cards to Core. Only rolls played by hand turn cards up; the bot's
+  leave them face down. The info panel still lists the dice as text.
+- **Tiles are drawn as their point.** `TilesView` lays a tile's art over its whole triangle
+  (`Assets/Data/TileArt.asset`; sprites in `Assets/Sprites/Tiles`, cropped to the 10x56 triangle). The art is drawn
+  for the bottom row and turned half round on the top row, as `points.png` does. A point that gains a tile plays the
+  artist's transition from its own colour (`BoardLayout.IsLightPoint`), e.g. `BeyazdanBarutHanesineAnimasyon` or
+  `SiyahtanBarutHanesineAnimasyon` for the Powder Keg's `Mayın_Hanesi`, and one that loses it plays it backwards.
+  `BoardManager` re-reads every point's tile when it redraws the board, so a run's tiles turn over when their stage
+  adds them and stay still for the matches after. So far only the Powder Keg has art; other tiles leave their point
+  plain. A tile that counts down (`ICountdownTile`) also shows its count in a small badge near the tip, above the
+  checkers — a placeholder until there is art for it. The Powder Keg's point counts 3, 2, 1 over every turn (either
+  player's), then destroys every checker on it for good (Reckless excepted) and starts again.
 - **Checkers are drawn from a skin per side** (`CheckerSkin`): the player's `player_checker.png`, with a ring
   while it can move with the rolled dice (`player_checker_movable.png`) and another while it is picked up
   (`player_checker_selected.png`); the opponent's `opponent_checker.png`. The player's special checkers wear

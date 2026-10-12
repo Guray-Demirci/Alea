@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ed700bf4b78f13d424208dcaf2e2d6, type: 3}
+  m_Name: TileArt
+  m_EditorClassIdentifier: Tavla.View::Tavla.View.TileArtSet
+  _tiles:
+  - Tile: 6
+    Point: {fileID: 21300000, guid: ac70e5da39f9112d9b501e86d0d88ea8, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: ff63a5146754859d789e57e8093a4090, type: 3}
+    - {fileID: 21300000, guid: 2c7dcdd0bbf2653a17e7a61fae4a0c52, type: 3}
+    - {fileID: 21300000, guid: 931e3ea130f11591730203f7539c513a, type: 3}
+    - {fileID: 21300000, guid: f2f44afc15f351bf3ce6628a8d29fd55, type: 3}
+    - {fileID: 21300000, guid: aafa1c590494507704a55da928c2a563, type: 3}
+    - {fileID: 21300000, guid: 24a0ce3660fe45416d5c7aff1bf712ae, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: b083b384aed8fb9c095b5b03c517627d, type: 3}
+    - {fileID: 21300000, guid: 2fdebbff68d9af5bce2e498292077f04, type: 3}
+    - {fileID: 21300000, guid: 0a4d19fc1be27129c68d1be90cf4324f, type: 3}
+    - {fileID: 21300000, guid: b0dabb3b9aa634930b2f7fecf2760d97, type: 3}
+    - {fileID: 21300000, guid: 13eb91827d1b6f163a7f45b18ab8f17b, type: 3}
+    - {fileID: 21300000, guid: 0643dca7b4d44d925dc4d1983a8b461b, type: 3}
+  _frameSeconds: 0.1
