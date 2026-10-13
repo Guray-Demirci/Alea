@@ -1,6 +1,7 @@
 using Tavla.Core.Abilities;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
+using Tavla.Core.Interfaces;
 using Tavla.Core.Runtime;
 
 namespace Tavla.Core.Tiles
@@ -15,14 +16,17 @@ namespace Tavla.Core.Tiles
     /// The only tile that overrides all three permission queries — it is the reason the hook set
     /// is so fine-grained.
     /// </summary>
-    public class DungeonTile : BaseTileEffect
+    public class DungeonTile : BaseTileEffect, IOpenCloseTile
     {
         public const string Id = "tile_dungeon";
 
         public override string EffectId => Id;
 
-        /// <summary>Are the bars closed? The View uses this to play the cage animation.</summary>
+        /// <summary>Are the bars closed?</summary>
         public bool IsClosed { get; private set; }
+
+        /// <summary>Are the bars up? The View shows the cage open or closed by it.</summary>
+        public bool IsOpen => !IsClosed;
 
         public DungeonTile(bool startClosed = true)
         {

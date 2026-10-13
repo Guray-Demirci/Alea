@@ -100,10 +100,13 @@ namespace Tavla.Core.Board
         }
 
         /// <summary>
-        /// Ends the turn: ticks tile counters, counts the turn and passes it on.
+        /// Ends the turn: ticks tile counters, counts the turn and passes it on. A volley still waiting for its
+        /// targets (Bowman) is lost.
         /// </summary>
         public void EndTurn()
         {
+            DropVolley();
+
             // Once the match is closed, turns no longer advance either.
             if (IsMatchOver)
                 return;

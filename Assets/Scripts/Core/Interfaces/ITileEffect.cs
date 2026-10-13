@@ -15,16 +15,18 @@ namespace Tavla.Core.Interfaces
     ///   OnCheckerLanded      -> Spike Pit, Maelstrom, Swamp, Fog, Toll Booth
     ///   OnCheckerLeft        -> Fog (restore abilities)
     ///   OnCheckerPassedOver  -> Toll Booth ("every checker that passes or sits here")
-    ///   OnTurnPassed         -> Powder Keg (the point's countdown), Swamp, Plunder Cove
-    ///   OnRoundPassed        -> Dungeon (open/close — per round, so both players see both states)
+    ///   OnTurnPassed         -> Swamp
+    ///   OnRoundPassed        -> Dungeon (open/close — per round, so both players see both states), Powder Keg (countdown)
     ///
     /// Optional capabilities live in their own interfaces so tiles without them carry no extra members:
-    ///   <see cref="IReleasableLock"/> -> Swamp (a die can be sacrificed to free a stuck checker)
-    ///   <see cref="ICountdownTile"/>  -> Powder Keg (the View shows its count)
+    ///   <see cref="IReleasableLock"/>   -> Swamp (a die can be sacrificed to free a stuck checker)
+    ///   <see cref="ICountdownTile"/>    -> Powder Keg (the View shows its count)
+    ///   <see cref="IOpenCloseTile"/>    -> Dungeon (the View shows it open or closed)
+    ///   <see cref="IScoreSeizingTile"/> -> Plunder Cove (captures and bear-offs on the point score nothing)
     ///
     /// A checker immune to tiles (Reckless) never reaches the per-checker hooks: GameState filters it out through
     /// <see cref="BaseChecker.IsAffectedByTiles"/>. Only a hook that walks the point's checkers itself
-    /// (Plunder Cove's OnTurnPassed) has to ask.
+    /// (the Powder Keg's blast) has to ask.
     /// </summary>
     public interface ITileEffect
     {

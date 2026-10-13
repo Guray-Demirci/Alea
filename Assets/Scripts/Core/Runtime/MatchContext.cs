@@ -16,7 +16,6 @@ namespace Tavla.Core.Runtime
         /// </summary>
         public const int ScorePenaltyPerMissingGold = 1 * GameState.ScoreScale;
 
-        private readonly int[] _turnScore;
         private readonly int[] _totalScore;
         private readonly int[] _gold;
         private readonly int[] _pinnedDie;
@@ -61,7 +60,6 @@ namespace Tavla.Core.Runtime
             _roller = new DiceRoller(random);
 
             int players = GameState.PlayerCount;
-            _turnScore = new int[players];
             _totalScore = new int[players];
             _gold = new int[players];
             _pinnedDie = new int[players];
@@ -81,7 +79,6 @@ namespace Tavla.Core.Runtime
         {
             GameState.ThrowIfInvalidPlayer(playerId);
 
-            _turnScore[playerId] += amount;
             _totalScore[playerId] += amount;
 
             ScoreChanged?.Invoke(playerId, _totalScore[playerId]);
@@ -91,17 +88,6 @@ namespace Tavla.Core.Runtime
             // (event above) by the time the match may end.
             Board.NotifyScoreChanged(playerId, _totalScore[playerId]);
             return amount;
-        }
-
-        /// <summary>Plunder Cove: takes back the score earned during this turn.</summary>
-        public void ResetTurnScore(int playerId)
-        {
-            GameState.ThrowIfInvalidPlayer(playerId);
-
-            _totalScore[playerId] -= _turnScore[playerId];
-            _turnScore[playerId] = 0;
-
-            ScoreChanged?.Invoke(playerId, _totalScore[playerId]);
         }
 
         public int GetScore(int playerId)
@@ -225,9 +211,6 @@ namespace Tavla.Core.Runtime
                 CurrentRoll.DropSecondDie();
                 _oneDieNextRoll[playerId] = false;
             }
-
-            // Reset before the reactions: score they earn belongs to this turn (Plunder Cove takes it back).
-            _turnScore[playerId] = 0;
 
             Board.NotifyDiceRolled(playerId, CurrentRoll);
 

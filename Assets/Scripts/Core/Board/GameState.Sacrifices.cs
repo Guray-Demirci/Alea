@@ -40,7 +40,7 @@ namespace Tavla.Core.Board
         /// <param name="chosen">The checker to sacrifice; null for the player's topmost one on the point.</param>
         private bool ResolveSacrifice(int nodeIndex, int playerId, bool commit, BaseChecker chosen)
         {
-            if (IsMatchOver || !IsOnBoard(nodeIndex))
+            if (IsMatchOver || IsAwaitingVolley || !IsOnBoard(nodeIndex))
                 return false;
 
             BaseChecker checker = PeekSource(nodeIndex, playerId, chosen);

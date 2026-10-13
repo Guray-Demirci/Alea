@@ -8,7 +8,11 @@ namespace Tavla.Core.Tiles
     /// <summary>
     /// Maelstrom Tile. "A checker that lands here is caught by the current and flung to a random point.
     /// If the opponent holds that point, the checker is captured and sent to the bar."
-    /// A full point (<see cref="GameState.StackLimit"/>) is skipped: the checker goes on to the next point.
+    /// The flung checker comes down by the rules of a move (<see cref="GameState.TeleportChecker"/>): it hits a lone
+    /// enemy, a Doomsday breaks the made point it falls on, and any other checker thrown onto a made point is broken
+    /// there itself.
+    /// A full point (<see cref="GameState.StackLimit"/>) is skipped: the checker goes on to the next point. So is a made
+    /// point for a checker nothing can capture (Armored), which could neither land nor break there.
     /// </summary>
     public class MaelstromTile : BaseTileEffect
     {
@@ -30,17 +34,12 @@ namespace Tavla.Core.Tiles
             _resolving = true;
             try
             {
-                int destination = PickDestination(context, node.Index, checker.OwnerId);
+                int destination = PickDestination(context, node.Index, checker);
                 if (destination == GameState.InvalidIndex)
                     return;
 
                 context.Board.ReportAbility(AbilityIds.MaelstromPull, checker, node.Index);
                 context.Board.TeleportChecker(checker, node.Index, destination);
-
-                // If the opponent holds the point it was flung to, the checker is captured.
-                Node landed = context.Board.Nodes[destination];
-                if (landed.IsBlockedFor(checker.OwnerId))
-                    context.Board.ForceCapture(checker, destination, OpponentOf(checker));
             }
             finally
             {
@@ -49,11 +48,12 @@ namespace Tavla.Core.Tiles
         }
 
         /// <summary>
-        /// Picks a random point other than the maelstrom's own point. A full point (<see cref="GameState.StackLimit"/>)
-        /// passes the checker on to the next one in its own direction, wrapping around the board.
+        /// Picks a random point other than the maelstrom's own point. A point that cannot take the checker
+        /// (<see cref="GameState.CanTeleportTo"/>) passes it on to the next one in its own direction, wrapping around
+        /// the board.
         /// </summary>
-        /// <returns>The destination, or <see cref="GameState.InvalidIndex"/> if every other point is full.</returns>
-        private static int PickDestination(IMatchContext context, int currentIndex, int playerId)
+        /// <returns>The destination, or <see cref="GameState.InvalidIndex"/> if no other point can take it.</returns>
+        private static int PickDestination(IMatchContext context, int currentIndex, BaseChecker checker)
         {
             int destination = context.Random.Range(0, GameState.NodeCount - 1);
 
@@ -61,11 +61,10 @@ namespace Tavla.Core.Tiles
             if (destination >= currentIndex)
                 destination++;
 
-            int direction = GameState.GetDirection(playerId);
+            int direction = GameState.GetDirection(checker.OwnerId);
             for (int step = 0; step < GameState.NodeCount; step++)
             {
-                if (destination != currentIndex &&
-                    context.Board.Nodes[destination].CheckerCount < GameState.StackLimit)
+                if (destination != currentIndex && context.Board.CanTeleportTo(checker, destination))
                     return destination;
 
                 destination = (destination + direction + GameState.NodeCount) % GameState.NodeCount;

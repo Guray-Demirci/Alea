@@ -53,7 +53,18 @@ namespace Tavla.Core.Board
 
                 // Every step pays exactly the die it was planned with — a Nomad's bonus would spend a smaller
                 // die the plan still needs — and moves the same checker, wherever it sits in its new stack.
-                MoveResult step = ResolveMove(current, next, playerId, true, MovePayment.ExactDie, mover);
+                // A volley the first step arms (Bowman) waits for the whole move, so it does not stop the later steps;
+                // the listeners of each step, run below, already see it waiting.
+                MoveResult step;
+                _continuingPlan = anyStepDone;
+                try
+                {
+                    step = ResolveMove(current, next, playerId, true, MovePayment.ExactDie, mover);
+                }
+                finally
+                {
+                    _continuingPlan = false;
+                }
 
                 if (!step.Success)
                 {
@@ -90,7 +101,7 @@ namespace Tavla.Core.Board
             if (!IsOnBoard(fromIndex) || !IsOnBoard(toIndex) || fromIndex == toIndex)
                 return false;
 
-            if (IsMatchOver || GetBarCount(playerId) > 0)
+            if (IsMatchOver || IsAwaitingVolley || GetBarCount(playerId) > 0)
                 return false;
 
             DiceRoll roll = Context != null ? Context.CurrentRoll : null;

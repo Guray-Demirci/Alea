@@ -23,9 +23,12 @@ namespace Tavla.Core.Abilities
         public const string CaptureConverted = "CaptureConverted";
         public const string TileIgnored = "TileIgnored";
         public const string PointMarked = "PointMarked";
+        public const string TeleportCrash = "TeleportCrash";
 
         // --- Checkers ---
         public const string AnchorPin = "AnchorPin";
+        public const string BowmanArrow = "BowmanArrow";
+        public const string BowmanVolley = "BowmanVolley";
         public const string CloverSelfHit = "CloverSelfHit";
         public const string CloverStrike = "CloverStrike";
         public const string DiceHolderReroll = "DiceHolderReroll";
@@ -49,8 +52,8 @@ namespace Tavla.Core.Abilities
         public const string KegExploded = "KegExploded";
         public const string MaelstromPull = "MaelstromPull";
         public const string Plundered = "Plundered";
-        public const string SpikeBroken = "SpikeBroken";
         public const string SpikeHit = "SpikeHit";
+        public const string SpikeResisted = "SpikeResisted";
         public const string SwampStuck = "SwampStuck";
         public const string SwampReleased = "SwampReleased";
         public const string TollPaid = "TollPaid";

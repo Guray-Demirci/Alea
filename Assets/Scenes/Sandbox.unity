@@ -167,6 +167,13 @@ MonoBehaviour:
   _backgroundSprite: {fileID: 21300000, guid: c29f4812d1414dd2821f4b2770d75a83, type: 3}
   _pointsSprite: {fileID: 21300000, guid: b84b7cdf653766efc54321a2f9706837, type: 3}
   _pointHighlightSprite: {fileID: 21300000, guid: 951e839bd42ae55282ad24cbd56e62d7, type: 3}
+  _markSprite: {fileID: 0}
+  _markColor: {r: 0.35, g: 0.95, b: 0.85, a: 1}
+  _volleyTargetSprite: {fileID: 0}
+  _volleyTargetColor: {r: 1, g: 0.45, b: 0.35, a: 0.8}
+  _volleyAimedSprite: {fileID: 0}
+  _volleyAimedColor: {r: 1, g: 0.2, b: 0.15, a: 1}
+  _volleyTask: SHOOT {0}
   _checkerPrefab: {fileID: 0}
   _nodePrefab: {fileID: 0}
   _player0Color: {r: 1, g: 1, b: 1, a: 1}
@@ -174,6 +181,7 @@ MonoBehaviour:
   _bearOffTrayColor: {r: 1, g: 1, b: 1, a: 0.08}
   _diceCardArt: {fileID: 11400000, guid: 19deb8094df24afa90fb45e51a674b92, type: 2}
   _tileArt: {fileID: 11400000, guid: af7271c253ee86c9be3c0c39e0ef7ce9, type: 2}
+  _crashDelay: 0.5
   _hud: {fileID: 0}
   _configureCamera: 1
   _cameraBackgroundColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
@@ -273,6 +281,8 @@ MonoBehaviour:
       Code: MU
     - ItemId: checker_hammer
       Code: HA
+    - ItemId: checker_bowman
+      Code: BO
   _targetScore: 0
   _turnLimit: 30
   _finalStretchTurns: 3
@@ -436,6 +446,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Tavla.Sandbox::Tavla.Sandbox.GodModePanel
   _board: {fileID: 1321423949}
+  _setup:
+    PlayerSpecials: 
+    PlayerCheckers: 15
+    OpponentCheckers: 15
+    Tiles: []
+    TargetScore: 0
+    TurnLimit: 99
+    FinalStretchTurns: 3
+    StartingGold: 0
+  _seed: 0
+  _toggleKey: 282
+  _panelWidth: 360
+  _referenceHeight: 900
+  _boardAspect: 1.7777778
+  _backdropColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
+  _panelColor: {r: 0.13, g: 0.13, b: 0.16, a: 0.97}
 --- !u!4 &1873465203
 Transform:
   m_ObjectHideFlags: 0

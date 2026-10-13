@@ -41,8 +41,6 @@ namespace Tavla.Core.Runtime
 
         public int GetScore(int playerId) => 0;
 
-        public void ResetTurnScore(int playerId) { }
-
         public void AddGold(int playerId, int amount) { }
 
         public void AddShopDiscount(int amount) { }

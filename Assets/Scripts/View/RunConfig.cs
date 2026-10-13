@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using Tavla.Core.Board;
+using Tavla.Core.Interfaces;
 using Tavla.Core.Relics;
 using Tavla.Core.Run;
 
@@ -62,6 +63,10 @@ namespace Tavla.View
                      "a tile on a point that already holds one replaces it.")]
             public TileEntry[] NewTiles = new TileEntry[0];
 
+            [Tooltip("Tiles drawn at random from the Tile Pool when the run reaches this stage, each on a random point " +
+                     "no stage places a tile on. They stay for the rest of the run. A tile comes at most once a run.")]
+            [Min(0)] public int RandomTiles;
+
             [Tooltip("How likely tier 1, 2, 3 and 4 are on a special checker shelf in the shops before this stage's " +
                      "matches (the one after the previous boss included). Relative weights: 70, 25, 5, 0 = 70% / 25% / " +
                      "5% / never. Empty = every special checker equally likely.")]
@@ -90,6 +95,11 @@ namespace Tavla.View
         [Header("Stages")]
         [Tooltip("The stages in play order.")]
         [SerializeField] private StageEntry[] _stages = new StageEntry[0];
+
+        [Header("Tiles")]
+        [Tooltip("Tiles a stage's Random Tiles are drawn from. Each may be listed once; a tile already on the board " +
+                 "this run — placed by a stage or drawn — is never drawn again.")]
+        [SerializeField] private TileKind[] _tilePool = new TileKind[0];
 
         [Header("Shop: items")]
         [Tooltip("Special checkers the shop may offer, with their tier. Each may be listed once.")]
@@ -120,8 +130,12 @@ namespace Tavla.View
             for (int s = 0; s < stages.Length; s++)
                 stages[s] = BuildStage(_stages[s], s);
 
+            Func<ITileEffect>[] tilePool = new Func<ITileEffect>[_tilePool.Length];
+            for (int i = 0; i < tilePool.Length; i++)
+                tilePool[i] = TileCatalog.GetFactory(_tilePool[i]);
+
             RunEconomy economy = new RunEconomy(_startingGold, _winGold, _bossWinGold, _goldPerUnusedTurn);
-            return new RunDefinition(stages, _startingCheckers, _finalStretchTurns, economy, BuildShop());
+            return new RunDefinition(stages, _startingCheckers, _finalStretchTurns, economy, BuildShop(), tilePool);
         }
 
         private ShopCatalog BuildShop()
@@ -195,7 +209,7 @@ namespace Tavla.View
 
             try
             {
-                return new StageDefinition(matches, tiles, odds);
+                return new StageDefinition(matches, tiles, odds, entry.RandomTiles);
             }
             catch (ArgumentException e)
             {

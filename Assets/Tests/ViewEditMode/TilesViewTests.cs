@@ -15,11 +15,18 @@ namespace Tavla.View.Tests
     public class TilesViewTests
     {
         private const string Keg = PowderKegTile.Id;
+        private const string Dungeon = DungeonTile.Id;
+
+        // Made up rather than a real tile without art yet: the real ones get their art one by one.
+        private const string TileWithoutArt = "tile_without_art";
         private const int LightPoint = 0;
         private const int DarkPoint = 1;
 
         // A whole change and half a frame more, so frame rounding never decides a test.
         private float Change => Frames(6.5f);
+
+        // The Dungeon's transition is longer: the stone spreads, then the bars go up.
+        private float DungeonChange => Frames(10.5f);
 
         private TileArtSet _art;
         private BoardLayout _layout;
@@ -113,12 +120,50 @@ namespace Tavla.View.Tests
         [Test]
         public void ATileWithoutArt_LeavesThePointPlain()
         {
-            _view.Show(LightPoint, SwampTile.Id);
+            _view.Show(LightPoint, TileWithoutArt);
             Assert.IsNull(SpriteOf(LightPoint));
 
             // From a tile without art to one with art: only the arriving tile has frames to play.
             _view.Show(LightPoint, Keg);
             Assert.AreSame(_art.GetTransition(Keg, true)[0], SpriteOf(LightPoint));
+        }
+
+        [Test]
+        public void AColourWithoutATransition_ShowsTheTileAtOnce()
+        {
+            // The keg with only its light transition, as a tile looks while the artist has drawn only that one.
+            TileArtSet lightOnly = ScriptableObject.CreateInstance<TileArtSet>();
+            SerializedObject asset = new SerializedObject(lightOnly);
+            SerializedProperty tiles = asset.FindProperty("_tiles");
+            tiles.arraySize = 1;
+
+            SerializedProperty entry = tiles.GetArrayElementAtIndex(0);
+            entry.FindPropertyRelative("Tile").intValue = (int)TileKind.PowderKeg;
+            entry.FindPropertyRelative("Point").objectReferenceValue = KegPoint;
+
+            IReadOnlyList<Sprite> fromLight = _art.GetTransition(Keg, true);
+            SerializedProperty frames = entry.FindPropertyRelative("FromLight");
+            frames.arraySize = fromLight.Count;
+            for (int i = 0; i < fromLight.Count; i++)
+                frames.GetArrayElementAtIndex(i).objectReferenceValue = fromLight[i];
+
+            entry.FindPropertyRelative("FromDark").arraySize = 0;
+            asset.ApplyModifiedPropertiesWithoutUndo();
+
+            TilesView view = TilesView.Create(lightOnly, _solid, _layout);
+            try
+            {
+                view.Show(DarkPoint, Keg);
+                Assert.AreSame(KegPoint, view.transform.GetChild(DarkPoint).GetComponent<SpriteRenderer>().sprite);
+
+                view.Show(LightPoint, Keg);
+                Assert.AreSame(fromLight[0], view.transform.GetChild(LightPoint).GetComponent<SpriteRenderer>().sprite);
+            }
+            finally
+            {
+                Object.DestroyImmediate(view.gameObject);
+                Object.DestroyImmediate(lightOnly);
+            }
         }
 
         [Test]
@@ -149,6 +194,52 @@ namespace Tavla.View.Tests
         }
 
         [Test]
+        public void ADungeon_RestsClosedOnItsPoint_AndOpensBackToItsOpenFrame()
+        {
+            IReadOnlyList<Sprite> transition = _art.GetTransition(Dungeon, true);
+            Sprite open = transition[_art.GetOpenFrame(Dungeon) - 1];
+            ShowAndSettle(LightPoint, Dungeon, false);
+            Assert.AreSame(_art.GetSprite(Dungeon), SpriteOf(LightPoint), "Closed: the bars down.");
+
+            _view.Show(LightPoint, Dungeon, true);
+            Assert.AreSame(transition[transition.Count - 1], SpriteOf(LightPoint), "The bars start going up.");
+            _view.Tick(DungeonChange);
+            Assert.AreSame(open, SpriteOf(LightPoint), "Open: the stone without bars.");
+
+            _view.Show(LightPoint, Dungeon, false);
+            Assert.AreSame(transition[_art.GetOpenFrame(Dungeon)], SpriteOf(LightPoint), "The bars start coming down.");
+            _view.Tick(DungeonChange);
+            Assert.AreSame(_art.GetSprite(Dungeon), SpriteOf(LightPoint));
+        }
+
+        [Test]
+        public void AnOpenDungeon_ArrivesAndLeaves_ThroughItsOpenFrame()
+        {
+            IReadOnlyList<Sprite> transition = _art.GetTransition(Dungeon, false);
+            int openFrame = _art.GetOpenFrame(Dungeon);
+
+            _view.Show(DarkPoint, Dungeon, true);
+            Assert.AreSame(transition[0], SpriteOf(DarkPoint));
+            _view.Tick(DungeonChange);
+            Assert.AreSame(transition[openFrame - 1], SpriteOf(DarkPoint), "Stops before the bars.");
+
+            _view.Show(DarkPoint, null);
+            Assert.AreSame(transition[openFrame - 2], SpriteOf(DarkPoint), "Back from where it stopped.");
+            _view.Tick(DungeonChange);
+            Assert.IsNull(SpriteOf(DarkPoint));
+        }
+
+        [Test]
+        public void ATileWithoutAnOpenFrame_LooksTheSameOpenOrClosed()
+        {
+            ShowAndSettle(LightPoint, Keg, true);
+            Assert.AreSame(KegPoint, SpriteOf(LightPoint));
+
+            _view.Show(LightPoint, Keg, false);
+            Assert.AreSame(KegPoint, SpriteOf(LightPoint), "Nothing to play.");
+        }
+
+        [Test]
         public void APointOffTheBoard_IsRefused()
         {
             Assert.Throws<System.ArgumentOutOfRangeException>(() => _view.Show(GameState.NodeCount, Keg));
@@ -174,10 +265,10 @@ namespace Tavla.View.Tests
 
         private Transform CountOf(int point) => _view.transform.GetChild(point).Find("Count");
 
-        private void ShowAndSettle(int point, string effectId)
+        private void ShowAndSettle(int point, string effectId, bool open = false)
         {
-            _view.Show(point, effectId);
-            _view.Tick(Change);
+            _view.Show(point, effectId, open);
+            _view.Tick(DungeonChange);
         }
 
         private Sprite SpriteOf(int point) => RendererOf(point).sprite;

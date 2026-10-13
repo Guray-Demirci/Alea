@@ -5,7 +5,7 @@ namespace Tavla.View
     ///
     /// The layers are relative to each other
     /// (background &lt; board &lt; points &lt; tiles &lt; dice cards &lt; marks &lt; tray &lt; highlight &lt; checkers &lt;
-    /// tile counts &lt; bar &lt; HUD),
+    /// volley marks &lt; tile counts &lt; bar &lt; HUD),
     /// so scattering the numbers across files made it easy to break the stacking by editing one of them.
     /// Values that are also exposed in the Inspector use these constants as their defaults.
     /// </summary>
@@ -40,6 +40,12 @@ namespace Tavla.View
 
         /// <summary>Checkers on a point; the stack index is added on top.</summary>
         public const int CheckerBase = 10;
+
+        /// <summary>
+        /// The mark over a checker a volley can hit or is aimed at (Bowman): above every checker on the points, so a
+        /// buried target shows through the stack; below a checker being dragged.
+        /// </summary>
+        public const int VolleyMark = 90;
 
         /// <summary>
         /// A tile's countdown near its point's tip (Powder Keg): above the checkers stacked on the point, so a full

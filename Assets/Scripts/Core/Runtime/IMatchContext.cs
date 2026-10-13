@@ -24,9 +24,6 @@ namespace Tavla.Core.Runtime
         /// <summary>The player's total score. GameState uses it to decide the winner at the end of the match.</summary>
         int GetScore(int playerId);
 
-        /// <summary>Plunder Cove: resets all score produced during this turn.</summary>
-        void ResetTurnScore(int playerId);
-
         // --- Economy ---
         void AddGold(int playerId, int amount);
 

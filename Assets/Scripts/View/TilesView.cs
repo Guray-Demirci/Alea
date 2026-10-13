@@ -15,6 +15,10 @@ namespace Tavla.View
     /// way to another goes through the plain point. A tile without art leaves its point plain. A change asked for
     /// while another is under way cuts that one short.
     ///
+    /// A tile that opens and closes (<see cref="Tavla.Core.Interfaces.IOpenCloseTile"/>, the Dungeon) rests on one frame
+    /// of its transition while open (<see cref="TileArtSet.GetOpenFrame"/>) and on its point while closed: closing plays
+    /// the frames between the two, opening plays them backwards.
+    ///
     /// A tile that counts down (<see cref="Tavla.Core.Interfaces.ICountdownTile"/>, the Powder Keg) also shows its count
     /// near the tip: a placeholder until the artist draws one, in the fuse's yellow on the keg's outline colour.
     /// </summary>
@@ -30,6 +34,9 @@ namespace Tavla.View
 
             /// <summary>The tile the point rests on, or is turning into; null = the plain point.</summary>
             public string Target;
+
+            /// <summary>Is <see cref="Target"/> shown open? Only a tile with an open frame looks any different.</summary>
+            public bool TargetOpen;
 
             public bool Changing;
             public float Elapsed;
@@ -118,18 +125,21 @@ namespace Tavla.View
 
         /// <summary>The point turns into this tile; null turns it back into the plain point.</summary>
         /// <param name="point">The point index, 0-23.</param>
+        /// <param name="effectId">The tile, or null for none.</param>
+        /// <param name="open">Is the tile open (<see cref="Tavla.Core.Interfaces.IOpenCloseTile"/>)? Closed otherwise.</param>
         /// <exception cref="ArgumentOutOfRangeException">A point off the board.</exception>
-        public void Show(int point, string effectId)
+        public void Show(int point, string effectId, bool open = false)
         {
             Slot slot = GetSlot(point);
-            if (effectId == slot.Target)
+            if (effectId == slot.Target && open == slot.TargetOpen)
                 return;
 
             if (slot.Changing)
                 Finish(slot);
 
-            CollectFrames(slot, slot.Target, effectId);
+            CollectFrames(slot, slot.Target, slot.TargetOpen, effectId, open);
             slot.Target = effectId;
+            slot.TargetOpen = open;
             slot.Elapsed = 0f;
             slot.Changing = true;
             slot.Renderer.sprite = slot.Frames[0];
@@ -192,35 +202,67 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// From one tile to another: the first one's transition backwards, the plain point for a frame, the second one's
-        /// forwards, then the second tile at rest. A null sprite is the plain point, since the overlay then hides nothing.
+        /// A tile's frames on a point line up as its transition and then the tile at rest (closed). Each look of the tile
+        /// is a stop on that line: closed is the last, open is its open frame. From one tile to another: back along the
+        /// first one's line, the plain point for a frame, along the second one's, then the second tile as it rests. The
+        /// same tile opening or closing only moves between its two stops. A null sprite is the plain point, since the
+        /// overlay then hides nothing.
         /// </summary>
-        private void CollectFrames(Slot slot, string from, string to)
+        private void CollectFrames(Slot slot, string from, bool fromOpen, string to, bool toOpen)
         {
             slot.Frames.Clear();
 
-            IReadOnlyList<Sprite> leaving = _art.GetTransition(from, slot.Light);
-            IReadOnlyList<Sprite> arriving = _art.GetTransition(to, slot.Light);
+            int stop = GetStop(to, toOpen, slot.Light);
 
-            if (leaving != null)
+            if (from == to)
             {
-                for (int i = leaving.Count - 1; i >= 0; i--)
-                    slot.Frames.Add(leaving[i]);
+                int start = GetStop(from, fromOpen, slot.Light);
+                for (int i = start + 1; i < stop; i++)
+                    slot.Frames.Add(GetFrame(to, i, slot.Light));
+
+                for (int i = start - 1; i > stop; i--)
+                    slot.Frames.Add(GetFrame(to, i, slot.Light));
+            }
+            else
+            {
+                for (int i = GetStop(from, fromOpen, slot.Light) - 1; i >= 0; i--)
+                    slot.Frames.Add(GetFrame(from, i, slot.Light));
+
+                if (_art.GetTransition(from, slot.Light) != null && _art.GetTransition(to, slot.Light) != null)
+                    slot.Frames.Add(null);
+
+                for (int i = 0; i < stop; i++)
+                    slot.Frames.Add(GetFrame(to, i, slot.Light));
             }
 
-            if (leaving != null && arriving != null)
-                slot.Frames.Add(null);
+            slot.Frames.Add(GetFrame(to, stop, slot.Light));
+        }
 
-            if (arriving != null)
-                slot.Frames.AddRange(arriving);
+        /// <summary>
+        /// Where on the tile's line it rests: its open frame while open, if it has one this colour can show; the end
+        /// (the tile closed) otherwise. 0 for no tile or a tile without art.
+        /// </summary>
+        private int GetStop(string effectId, bool open, bool light)
+        {
+            IReadOnlyList<Sprite> transition = _art.GetTransition(effectId, light);
+            if (transition == null)
+                return 0;
 
-            slot.Frames.Add(_art.GetSprite(to));
+            int openFrame = _art.GetOpenFrame(effectId);
+            return open && openFrame > 0 && openFrame <= transition.Count ? openFrame - 1 : transition.Count;
+        }
+
+        /// <summary>The tile's frame at this place on its line: a transition frame, or past them the tile closed.</summary>
+        private Sprite GetFrame(string effectId, int index, bool light)
+        {
+            IReadOnlyList<Sprite> transition = _art.GetTransition(effectId, light);
+            return transition != null && index < transition.Count ? transition[index] : _art.GetSprite(effectId);
         }
 
         private void Finish(Slot slot)
         {
             slot.Changing = false;
-            slot.Renderer.sprite = _art.GetSprite(slot.Target);
+            slot.Renderer.sprite = GetFrame(slot.Target, GetStop(slot.Target, slot.TargetOpen, slot.Light), slot.Light);
         }
     }
 }

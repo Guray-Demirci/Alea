@@ -33,6 +33,7 @@ namespace Tavla.View
         DiceHolder = 26,
         Kraken = 27,
         Mutiny = 28,
-        Hammer = 29
+        Hammer = 29,
+        Bowman = 30
     }
 }

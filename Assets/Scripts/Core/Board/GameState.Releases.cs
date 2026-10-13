@@ -40,7 +40,7 @@ namespace Tavla.Core.Board
         /// <param name="chosen">The checker to free; null for the player's topmost one the tile will free.</param>
         private bool ResolveRelease(int nodeIndex, int playerId, bool commit, BaseChecker chosen)
         {
-            if (IsMatchOver || !IsOnBoard(nodeIndex))
+            if (IsMatchOver || IsAwaitingVolley || !IsOnBoard(nodeIndex))
                 return false;
 
             // As with bearing off, the bar comes first: nothing else may be played while a checker waits there.

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Tavla.Core.Abilities;
 using Tavla.Core.Checkers;
 using Tavla.Core.Interfaces;
@@ -220,7 +221,9 @@ namespace Tavla.Core.Board
                     break;
 
                 case CaptureDestination.Destroyed:
+                    // Destroyed means gone from the run too: in a run the checker also leaves its owner's deck.
                     CheckerDestroyed?.Invoke(victim, node.Index);
+                    CheckerLostForGood?.Invoke(victim, node.Index);
                     break;
 
                 case CaptureDestination.Converted:
@@ -233,6 +236,11 @@ namespace Tavla.Core.Board
 
                 default:
                     _bar[victim.OwnerId].Add(victim);
+
+                    // It comes back a plain checker: its abilities wait until it has entered again. Checker objects
+                    // are SHARED with clones, so, as the Fog's lock, this does not happen in a simulation.
+                    if (SideEffectsEnabled)
+                        victim.SetReentering(true);
                     break;
             }
 
@@ -313,7 +321,8 @@ namespace Tavla.Core.Board
         ///
         /// The RAW amount is <see cref="CaptureScore"/> or <see cref="BearOffScore"/>, unless the player has marked the
         /// point (<see cref="ScoreMark"/>, Navigator footprints). The earner's own <see cref="IScoreModifier"/>
-        /// (Catalyst) then shapes it before it is written.
+        /// (Catalyst) then shapes it before it is written. A point whose tile seizes its score
+        /// (<see cref="IScoreSeizingTile"/>, Plunder Cove) earns nothing at all.
         /// </summary>
         /// <param name="earner">Checker whose capture or bear-off earned the score; null if no checker did.</param>
         /// <param name="nodeIndex">Where it happened: the capture's point or the bear-off's source point.</param>
@@ -321,6 +330,15 @@ namespace Tavla.Core.Board
         {
             if (Context == null)
                 return 0;
+
+            // A checker immune to tiles (Reckless) keeps what it earns there. A capture no checker landed for (a tile's,
+            // Clover's, a volley's) has no checker to be immune, so the tile seizes it.
+            if (IsOnBoard(nodeIndex) && _nodes[nodeIndex].ActiveTile is IScoreSeizingTile &&
+                (earner == null || earner.IsAffectedByTiles))
+            {
+                ReportAbility(AbilityIds.Plundered, earner, nodeIndex);
+                return 0;
+            }
 
             ScoreMark mark = IsOnBoard(nodeIndex) ? _nodes[nodeIndex].GetMark(playerId) : null;
             int rawAmount = source == ScoreSource.Capture
@@ -364,10 +382,33 @@ namespace Tavla.Core.Board
 
         #region Forced relocation / destruction
 
-        /// <summary>For effects that forcibly move a checker, such as the Maelstrom tile.</summary>
+        /// <summary>
+        /// Can a checker be thrown onto this point by force (Maelstrom)? Never onto a full point (<see cref="StackLimit"/>).
+        /// Any other point takes it: one it could move to in normal play, or one it may not enter, which breaks it —
+        /// unless nothing can capture it (Armored), so it could neither land nor break there.
+        /// </summary>
+        internal bool CanTeleportTo(BaseChecker checker, int toIndex)
+        {
+            if (!IsOnBoard(toIndex) || _nodes[toIndex].CheckerCount >= StackLimit)
+                return false;
+
+            List<BaseChecker> captures;
+            bool infiltration;
+            return checker.CanBeCaptured ||
+                   CheckLanding(checker, toIndex, checker.OwnerId, false, out captures, out infiltration) == MoveError.None;
+        }
+
+        /// <summary>
+        /// For effects that forcibly move a checker, such as the Maelstrom tile. The checker comes down by the rules of
+        /// a move: it hits a lone enemy, a Doomsday sweeps a made point, a Parasite moves in, and then the point's tile
+        /// acts on it. A point it could not move to in normal play — a made point, a lone Armored, a closed Dungeon —
+        /// breaks it: it reaches the point and is captured there, for the opponent. That is reported
+        /// (<see cref="AbilityIds.TeleportCrash"/>) before the capture, so the View can show it arrive first.
+        /// Does nothing where <see cref="CanTeleportTo"/> says no.
+        /// </summary>
         internal void TeleportChecker(BaseChecker checker, int fromIndex, int toIndex)
         {
-            if (!IsOnBoard(fromIndex) || !IsOnBoard(toIndex))
+            if (!IsOnBoard(fromIndex) || !CanTeleportTo(checker, toIndex))
                 return;
 
             // The tile must see the "checker left" hook: a checker dragged out of the Fog must regain
@@ -375,12 +416,45 @@ namespace Tavla.Core.Board
             if (!RemoveFromNode(_nodes[fromIndex], checker))
                 return;
 
-            _nodes[toIndex].Push(checker);
+            // A real landing, as a move's: it reports the abilities it uses and spends shields.
+            int playerId = checker.OwnerId;
+            List<BaseChecker> captures;
+            bool infiltration;
+            MoveError landing = CheckLanding(checker, toIndex, playerId, true, out captures, out infiltration);
+
+            Node target = _nodes[toIndex];
+            if (landing != MoveError.None)
+            {
+                target.Push(checker);
+                CheckerTeleported?.Invoke(checker, fromIndex, toIndex);
+                ReportAbility(AbilityIds.TeleportCrash, checker, toIndex);
+                ForceCapture(checker, toIndex, GetOpponent(playerId));
+                return;
+            }
+
+            // Its victims are captured as a move's are, and score for its owner.
+            bool retaliation = false;
+            if (captures != null)
+            {
+                for (int i = 0; i < captures.Count; i++)
+                {
+                    bool retaliates;
+                    ApplyCapture(captures[i], target, playerId, checker, out retaliates);
+                    retaliation |= retaliates;
+                }
+            }
+
+            target.Push(checker);
             CheckerTeleported?.Invoke(checker, fromIndex, toIndex);
 
-            ITileEffect tile = TileFor(_nodes[toIndex], checker);
-            if (SideEffectsEnabled && tile != null)
-                tile.OnCheckerLanded(Context, _nodes[toIndex], checker);
+            ApplyLandingTile(target, checker);
+
+            // Gunpowder Checker: as after a move — unless the tile above has already moved the checker on.
+            if (retaliation && FindNodeIndexOf(checker) == toIndex)
+            {
+                ReportAbility(AbilityIds.CaptureRetaliation, checker, toIndex);
+                ForceCapture(checker, toIndex, GetOpponent(playerId));
+            }
         }
 
         /// <summary>

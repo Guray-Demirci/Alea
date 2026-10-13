@@ -70,6 +70,9 @@ namespace Tavla.Core.Board
             if (!IsOnBoard(fromIndex))
                 return MoveResult.Fail(MoveError.OutOfBounds, fromIndex, BearOffIndex, playerId);
 
+            if (IsAwaitingVolley)
+                return MoveResult.Fail(MoveError.VolleyPending, fromIndex, BearOffIndex, playerId);
+
             // The bar rule still applies: no bearing off before entering the checker on the bar.
             if (GetBarCount(playerId) > 0)
                 return MoveResult.Fail(MoveError.MustEnterFromBar, fromIndex, BearOffIndex, playerId);

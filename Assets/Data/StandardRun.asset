@@ -33,6 +33,7 @@ MonoBehaviour:
       OpponentCheckers: 8
       IsBoss: 1
     NewTiles: []
+    RandomTiles: 0
     ShopTierOdds:
     - 70
     - 25
@@ -52,6 +53,7 @@ MonoBehaviour:
       OpponentCheckers: 12
       IsBoss: 1
     NewTiles: []
+    RandomTiles: 1
     ShopTierOdds:
     - 40
     - 35
@@ -71,11 +73,20 @@ MonoBehaviour:
       OpponentCheckers: 15
       IsBoss: 1
     NewTiles: []
+    RandomTiles: 1
     ShopTierOdds:
     - 20
     - 30
     - 35
     - 15
+  _tilePool:
+  - 0
+  - 1
+  - 2
+  - 4
+  - 5
+  - 6
+  - 7
   _shopCheckers:
   - Checker: 18
     Tier: 1
@@ -130,6 +141,8 @@ MonoBehaviour:
   - Checker: 15
     Tier: 3
   - Checker: 16
+    Tier: 4
+  - Checker: 30
     Tier: 4
   _shopCards:
   - 0

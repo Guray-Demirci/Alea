@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using Tavla.Core.Interfaces;
+using Tavla.Core.Run;
 using UnityEditor;
 using UnityEngine;
 
@@ -90,6 +92,91 @@ namespace Tavla.View.Tests
             Assert.AreEqual("Mayın_Hanesi", art.GetSprite(keg).name);
             Assert.AreEqual(6, art.GetTransition(keg, true).Count, "BeyazdanBarutHanesineAnimasyon frames 2-7.");
             Assert.AreEqual(6, art.GetTransition(keg, false).Count, "SiyahtanBarutHanesineAnimasyon frames 2-7.");
+        }
+
+        [Test]
+        public void TileArt_HasTheMaelstrom_WithItsLightTransition()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string maelstrom = TileCatalog.GetEffectId(TileKind.Maelstrom);
+
+            Assert.AreEqual("Girdap Hanesi", art.GetSprite(maelstrom).name);
+            Assert.AreEqual(6, art.GetTransition(maelstrom, true).Count, "BeyazdanGirdapHanesineAnimasyon frames 2-7.");
+        }
+
+        [Test]
+        public void TileArt_HasTheSwamp_WithBothTransitions()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string swamp = TileCatalog.GetEffectId(TileKind.Swamp);
+
+            Assert.AreEqual("Bataklık Hanesi", art.GetSprite(swamp).name);
+            Assert.AreEqual(6, art.GetTransition(swamp, true).Count, "BeyazdanBataklıkHanesiAnimasyon frames 2-7.");
+            Assert.AreEqual(6, art.GetTransition(swamp, false).Count, "SiyahtanBataklıkHanesiAnimasyon frames 2-7.");
+        }
+
+        [Test]
+        public void TileArt_HasTheSpikePit_WithBothTransitions()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string spikePit = TileCatalog.GetEffectId(TileKind.SpikePit);
+
+            Assert.AreEqual("TahtaKazıkHanesi", art.GetSprite(spikePit).name);
+            Assert.AreEqual(6, art.GetTransition(spikePit, true).Count, "BeyazdanTahtaKazıkAnimasyon frames 2-7.");
+            Assert.AreEqual(6, art.GetTransition(spikePit, false).Count, "SiyahdanTahtaKazıkAnimasyon frames 2-7.");
+        }
+
+        [Test]
+        public void TileArt_HasTheFog_WithBothTransitions()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string fog = TileCatalog.GetEffectId(TileKind.Fog);
+
+            Assert.AreEqual("SisHanesi", art.GetSprite(fog).name);
+            Assert.AreEqual(6, art.GetTransition(fog, true).Count, "BeyazdanSisHanesiAnimasyon frames 2-7.");
+            Assert.AreEqual(6, art.GetTransition(fog, false).Count, "SiyahdanSisHanesiAnimasyon frames 2-7.");
+        }
+
+        [Test]
+        public void TileArt_HasTheDungeon_WithBothTransitions()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string dungeon = TileCatalog.GetEffectId(TileKind.Dungeon);
+
+            // Longer than the others: the stone spreads, then the bars go up.
+            Assert.AreEqual("ZindanHanesi", art.GetSprite(dungeon).name);
+            Assert.AreEqual(9, art.GetTransition(dungeon, true).Count, "BeyazdanZindanHanesineAnimasyon frames 2-10.");
+            Assert.AreEqual(9, art.GetTransition(dungeon, false).Count, "SiyahdanZindanHanesineAnimasyon frames 2-10.");
+
+            // Open: the artist's frame 6, the stone before the bars; the frames after it close the cage.
+            Assert.AreEqual(5, art.GetOpenFrame(dungeon));
+            Assert.AreEqual("BeyazdanZindanHanesineAnimasyon_6", art.GetTransition(dungeon, true)[4].name);
+            Assert.AreEqual("SiyahdanZindanHanesineAnimasyon_6", art.GetTransition(dungeon, false)[4].name);
+        }
+
+        [Test]
+        public void TileArt_HasThePlunderCove_WithBothTransitions()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string cove = TileCatalog.GetEffectId(TileKind.PlunderCove);
+
+            Assert.AreEqual("KorsanKoyu", art.GetSprite(cove).name);
+            Assert.AreEqual(6, art.GetTransition(cove, true).Count, "BeyazdanKorsanKoyuAnimasyon frames 2-7.");
+            Assert.AreEqual(6, art.GetTransition(cove, false).Count, "SiyahtanKorsanKoyuAnimasyon frames 2-7.");
+        }
+
+        [Test]
+        public void StandardRun_DrawsOnlyTilesThatHaveArt()
+        {
+            // A tile without art would leave its point plain, so the player could not see it.
+            RunDefinition run = Load<RunConfig>(StandardRunPath).ToDefinition();
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+
+            foreach (Func<ITileEffect> createTile in run.TilePool)
+            {
+                string effectId = createTile().EffectId;
+                Assert.IsNotNull(art.GetSprite(effectId), $"{effectId} is in the tile pool but has no art in {TileArtPath}.");
+            }
         }
 
         [Test]

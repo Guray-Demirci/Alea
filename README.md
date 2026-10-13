@@ -36,7 +36,10 @@ Key rules of the design:
 - **Runs are data.** A run (the first game mode: 3 stages of 3 matches, the last of each a boss) is a
   `RunConfig` asset (*Create → Tavla → Run*; the designed one is `Assets/Data/StandardRun.asset`): each
   match's target score, turn limit and opponent checkers, the tiles each stage adds for the rest of the run,
-  the player's starting deck and the gold rules. Core validates it as a `RunDefinition`; `RunState` deals
+  the player's starting deck and the gold rules. A stage can also draw *Random Tiles* from the run's *Tile Pool*
+  when the run reaches it, each on a random point no stage places a tile on; a tile comes at most once a run, so
+  the next stage never brings the tile the last one did (the standard run draws one as stages 2 and 3 begin).
+  Core validates it as a `RunDefinition`; `RunState` deals
   the matches one by one, carries the deck and gold between them and ends the run on the first loss. Assign
   the asset to `BoardManager`'s *Run* field; without one the scene plays a single sandbox match.
 - **Starting positions are dealt, not fixed.** `StartingPatterns` holds the designed stack formations for
@@ -65,10 +68,15 @@ Key rules of the design:
   artist's transition from its own colour (`BoardLayout.IsLightPoint`), e.g. `BeyazdanBarutHanesineAnimasyon` or
   `SiyahtanBarutHanesineAnimasyon` for the Powder Keg's `Mayın_Hanesi`, and one that loses it plays it backwards.
   `BoardManager` re-reads every point's tile when it redraws the board, so a run's tiles turn over when their stage
-  adds them and stay still for the matches after. So far only the Powder Keg has art; other tiles leave their point
-  plain. A tile that counts down (`ICountdownTile`) also shows its count in a small badge near the tip, above the
-  checkers — a placeholder until there is art for it. The Powder Keg's point counts 3, 2, 1 over every turn (either
-  player's), then destroys every checker on it for good (Reckless excepted) and starts again.
+  adds them and stay still for the matches after. So far the Powder Keg, the Maelstrom (`Girdap Hanesi`), the
+  Swamp (`Bataklık Hanesi`), the Spike Pit (`TahtaKazıkHanesi`), the Fog (`SisHanesi`), the Dungeon
+  (`ZindanHanesi`) and the Plunder Cove (`KorsanKoyu`) have art; other tiles leave their point plain, so the standard
+  run's tile pool holds only these seven. A tile that opens and closes (`IOpenCloseTile`) rests open on one frame of its transition (`OpenFrame` in the
+  art asset) and closed on its point: the Dungeon shows the stone without bars (the artist's frame 6) on its open
+  rounds, the bars down (`ZindanHanesi`) on its closed ones, and plays the bars going up or down in between. The Maelstrom has only its light-point transition
+  (`BeyazdanGirdapHanesineAnimasyon`), so on a dark point it appears at once. A tile that counts down (`ICountdownTile`) also shows its count in a small badge near the tip, above the
+  checkers — a placeholder until there is art for it. The Powder Keg's point counts 3, 2, 1, one step per round (once
+  both players have played), then destroys every checker on it for good (Reckless excepted) and starts again.
 - **Checkers are drawn from a skin per side** (`CheckerSkin`): the player's `player_checker.png`, with a ring
   while it can move with the rolled dice (`player_checker_movable.png`) and another while it is picked up
   (`player_checker_selected.png`); the opponent's `opponent_checker.png`. The player's special checkers wear
@@ -76,6 +84,13 @@ Key rules of the design:
   names kept so re-exports overwrite them), with a shared ring for the movable and picked-up states. Which
   checker can move is Core's answer (`GameState.GetMovableChecker`, the same rule `HasAnyLegalMove` uses);
   the View only paints it.
+- **A volley waits for its targets.** The Bowman's first move of a turn arms a volley of one arrow per point it
+  moved (a compound move counts its first die). `GameState` then waits (`HasPendingVolley`) until the player picks
+  that many of the opponent's checkers on the board (`TryFireVolley`; made points too, not Armored ones) and accepts
+  nothing else meanwhile; a volley not fired by the end of the turn is lost. While a human's volley waits,
+  `BoardManager` marks every checker it can hit, a click picks one (a second click drops it), the volley fires on the
+  last pick and the info panel's task line counts the picks left. The marks are built-in placeholders until there is
+  art (*Volley* fields). The bot fires its own at the checkers closest to bearing off.
 - **The info panel is built in code too.** `HudView` draws `general_info.png` (exported from
   `general_info_scheme.aseprite`) and writes the values `HudPresenter` gives it into text boxes measured
   pixel by pixel from the art, as the shop does. If a strip moves in the art, update its box in the Inspector.
@@ -94,6 +109,10 @@ run are untouched by it. Open the scene and press Play; the **GOD MODE** panel d
   between Play sessions; *Reset setup* goes back to the one in the `GodMode` object's Inspector.
 - **Match**: load the dice (*Roll 6-6 now* re-rolls the current turn on the chosen faces; the lock toggles keep every
   roll of a side on them), switch the bot off to play both sides by hand, add gold or score, end the turn.
+- **Tiles in play**: put any tile on any point of the match being played, or take a point's tile off, without dealing
+  again. The point grid is laid out like the board (top row 0-11 from the left, bottom row 23-12; `*` = holds a
+  tile). A tile put on checkers catches only the ones that land there afterwards; the next deal goes back to the
+  setup's tiles.
 - **Log**: every roll, move, ability (`*`), tile (`#`), capture, score and gold change Core reports. Hovering a checker
   shows its name, side and point.
 

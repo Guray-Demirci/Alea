@@ -64,6 +64,7 @@ namespace Tavla.Core.Tests
             Assert.Throws<ArgumentException>(() => new StageDefinition(
                 new[] { Match() },
                 new[] { TilePlacement.Of<SwampTile>(7), TilePlacement.Of<FogTile>(7) }));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new StageDefinition(new[] { Match() }, randomTileCount: -1));
         }
 
         [Test]
@@ -93,6 +94,41 @@ namespace Tavla.Core.Tests
                 tiles[i] = TilePlacement.Of<FogTile>(i);
 
             Assert.Throws<ArgumentException>(() => Run(Stage(), Stage(tiles)));
+        }
+
+        [Test]
+        public void RunDefinition_CountsTheRandomTilesWhenCheckingRoomForTheCheckers()
+        {
+            // Ten tiles in the middle of the board still leave each side the free points its formations need.
+            TilePlacement[] tiles = new TilePlacement[10];
+            for (int i = 0; i < tiles.Length; i++)
+                tiles[i] = TilePlacement.Of<FogTile>(6 + i);
+
+            Assert.DoesNotThrow(() => Run(AllTiles(), Stage(tiles)));
+            Assert.Throws<ArgumentException>(() => Run(AllTiles(), Stage(tiles), RandomStage(1)));
+        }
+
+        [Test]
+        public void RunDefinition_RejectsATilePoolWithANullOrTwiceListedTile()
+        {
+            Assert.Throws<ArgumentException>(() => Run(new Func<ITileEffect>[] { null }, Stage()));
+            Assert.Throws<ArgumentException>(() => Run(new Func<ITileEffect>[] { () => null }, Stage()));
+            Assert.Throws<ArgumentException>(
+                () => Run(new Func<ITileEffect>[] { () => new SwampTile(), () => new SwampTile() }, Stage()));
+        }
+
+        [Test]
+        public void RunDefinition_RejectsMoreRandomTilesThanThePoolHasTilesNoStagePlaces()
+        {
+            Func<ITileEffect>[] pool = { () => new SwampTile(), () => new FogTile() };
+
+            Assert.DoesNotThrow(() => Run(pool, Stage(), RandomStage(1), RandomStage(1)));
+            Assert.Throws<ArgumentException>(() => Run(pool, Stage(), RandomStage(1), RandomStage(2)));
+            Assert.Throws<ArgumentException>(() => Run(RandomStage(1)), "A run without a pool draws nothing.");
+
+            // A stage places the Swamp itself, so only the Fog is left to draw.
+            Assert.Throws<ArgumentException>(
+                () => Run(pool, Stage(TilePlacement.Of<SwampTile>(8)), RandomStage(1), RandomStage(1)));
         }
 
         [Test]
@@ -315,6 +351,38 @@ namespace Tavla.Core.Tests
         }
 
         [Test]
+        public void ACapturedSacrificialChecker_LeavesTheDeck()
+        {
+            RunState run = new RunState(ThreeByThree(), new FixedRandom());
+            run.AddToDeck(ownerId => new SacrificialChecker(ownerId));
+            GameState board = run.StartMatch().Board;
+            SacrificialChecker sacrificial = FindCheckers<SacrificialChecker>(board)[0];
+
+            board.ForceCapture(sacrificial, board.FindNodeIndexOf(sacrificial), GameState.GetOpponent(run.PlayerId));
+            Win(run);
+
+            Assert.AreEqual(StartingCheckers, run.Deck.Count);
+            Assert.IsFalse(run.OwnsChecker(SacrificialChecker.Id), "The shop may offer it again.");
+            Assert.AreEqual(1, run.ShopDiscount, "The discount it paid for stays.");
+            Assert.AreEqual(0, FindCheckers<SacrificialChecker>(run.StartMatch().Board).Count);
+        }
+
+        [Test]
+        public void ACheckerCapturedToTheBar_StaysInTheDeck()
+        {
+            // One checker over the minimum, so a lost one would show: the deck is only filled back up to the minimum.
+            RunState run = new RunState(ThreeByThree(), new FixedRandom());
+            run.AddToDeck(ownerId => new ArmoredChecker(ownerId));
+            GameState board = run.StartMatch().Board;
+            List<DefaultChecker> plain = FindCheckers<DefaultChecker>(board).FindAll(c => c.OwnerId == run.PlayerId);
+
+            board.ForceCapture(plain[0], board.FindNodeIndexOf(plain[0]), GameState.GetOpponent(run.PlayerId));
+            Win(run);
+
+            Assert.AreEqual(StartingCheckers + 1, run.Deck.Count);
+        }
+
+        [Test]
         public void ADeckThatFallsBelowTheMinimum_IsFilledUpWithPlainCheckers()
         {
             RunState run = new RunState(ThreeByThree(), new FixedRandom());
@@ -476,6 +544,52 @@ namespace Tavla.Core.Tests
         }
 
         [Test]
+        public void EnteringAStage_DrawsItsRandomTiles_FromThePoolTilesNotOnTheBoardYet()
+        {
+            // FixedRandom draws the first tile left in the pool onto the lowest point no stage places a tile on.
+            Func<ITileEffect>[] pool = { () => new PowderKegTile(), () => new SwampTile(), () => new FogTile() };
+            RunState run = new RunState(
+                Run(pool, Stage(TilePlacement.Of<PowderKegTile>(0)), RandomStage(1), RandomStage(1)), new FixedRandom());
+
+            AssertLayout(run.Tiles, (0, PowderKegTile.Id));
+
+            run.StartMatch();
+            Win(run);
+            AssertLayout(run.Tiles, (0, PowderKegTile.Id), (1, SwampTile.Id));
+
+            RunMatch match = run.StartMatch();
+            Assert.IsInstanceOf<SwampTile>(match.Board.Nodes[1].ActiveTile, "The drawn tile is on the board.");
+            Win(run);
+            AssertLayout(run.Tiles, (0, PowderKegTile.Id), (1, SwampTile.Id), (2, FogTile.Id));
+        }
+
+        [Test]
+        public void RandomTiles_NeverRepeatInARun_NorCoverAStagesOwnTile()
+        {
+            for (int seed = 1; seed <= 200; seed++)
+            {
+                RunState run = new RunState(
+                    Run(AllTiles(), Stage(TilePlacement.Of<SwampTile>(8)), RandomStage(2),
+                        Stage(TilePlacement.Of<FogTile>(14)), RandomStage(3)),
+                    new SystemRandomProvider(seed));
+
+                while (run.CanStartMatch)
+                {
+                    run.StartMatch();
+                    Win(run);
+                }
+
+                HashSet<string> ids = new HashSet<string>();
+                foreach (TilePlacement tile in run.Tiles)
+                    Assert.IsTrue(ids.Add(tile.CreateTile().EffectId), $"Seed {seed}: a tile came twice.");
+
+                Assert.AreEqual(7, ids.Count, $"Seed {seed}");
+                AssertTileAt(run.Tiles, 8, SwampTile.Id, seed);
+                AssertTileAt(run.Tiles, 14, FogTile.Id, seed);
+            }
+        }
+
+        [Test]
         public void PlayingFromSeatOne_TheTargetAndTheDeckFollowThePlayer()
         {
             RunState run = new RunState(ThreeByThree(), new FixedRandom(), playerId: 1);
@@ -523,6 +637,26 @@ namespace Tavla.Core.Tests
         private static RunDefinition Run(params StageDefinition[] stages)
         {
             return new RunDefinition(stages, StartingCheckers, FinalStretch, Economy());
+        }
+
+        private static RunDefinition Run(Func<ITileEffect>[] tilePool, params StageDefinition[] stages)
+        {
+            return new RunDefinition(stages, StartingCheckers, FinalStretch, Economy(), tilePool: tilePool);
+        }
+
+        /// <summary>A one-match stage that draws this many tiles at random.</summary>
+        private static StageDefinition RandomStage(int randomTiles)
+        {
+            return new StageDefinition(new[] { Match() }, randomTileCount: randomTiles);
+        }
+
+        private static Func<ITileEffect>[] AllTiles()
+        {
+            return new Func<ITileEffect>[]
+            {
+                () => new SwampTile(), () => new FogTile(), () => new MaelstromTile(), () => new TollBoothTile(),
+                () => new DungeonTile(), () => new SpikePitTile(), () => new PowderKegTile(), () => new PlunderCoveTile()
+            };
         }
 
         /// <summary>The first game mode's shape: 3 stages of 3 matches ending in a boss, each stage adding one tile.</summary>
@@ -586,6 +720,20 @@ namespace Tavla.Core.Tests
                 Assert.AreEqual(expected[i].Point, layout[i].Point);
                 Assert.AreEqual(expected[i].EffectId, layout[i].CreateTile().EffectId);
             }
+        }
+
+        private static void AssertTileAt(IReadOnlyList<TilePlacement> layout, int point, string effectId, int seed)
+        {
+            foreach (TilePlacement tile in layout)
+            {
+                if (tile.Point == point)
+                {
+                    Assert.AreEqual(effectId, tile.CreateTile().EffectId, $"Seed {seed}: point {point}");
+                    return;
+                }
+            }
+
+            Assert.Fail($"Seed {seed}: no tile on point {point}.");
         }
 
         #endregion

@@ -50,6 +50,9 @@ namespace Tavla.View
         // Draws the state ring around art that has no state sprites of its own; created only for such a skin.
         private SpriteRenderer _ring;
 
+        // Marks the checker as a volley's target (Bowman); created the first time it is needed.
+        private SpriteRenderer _volleyMark;
+
         // Reused for the drop query so releasing a checker does not allocate. Sized for the worst case:
         // all 30 checkers stacked under the pointer plus the point collider — a smaller buffer could
         // truncate the results and silently drop the NodeView we are looking for.
@@ -57,6 +60,9 @@ namespace Tavla.View
 
         /// <summary>The Core object this visual represents. The View uses it ONLY as an identity.</summary>
         public BaseChecker Model => _model;
+
+        /// <summary>Has the checker come to rest on its target? Never while it is being dragged.</summary>
+        public bool IsAtTarget => !_isDragging && transform.position == _targetPosition;
 
         private void Awake()
         {
@@ -134,6 +140,34 @@ namespace Tavla.View
             return ring;
         }
 
+        /// <summary>
+        /// Shows whether a waiting volley can hit this checker or is aimed at it (Bowman); null hides the mark. ONLY
+        /// BoardManager calls this, with Core's answer.
+        /// </summary>
+        public void SetVolleyMark(Sprite sprite, Color color)
+        {
+            if (sprite == null)
+            {
+                if (_volleyMark != null)
+                    _volleyMark.enabled = false;
+                return;
+            }
+
+            if (_volleyMark == null)
+            {
+                GameObject go = new GameObject("VolleyMark");
+                go.transform.SetParent(transform, false);
+
+                // Its own layer above every checker on the points, so a target buried in a stack still shows.
+                _volleyMark = go.AddComponent<SpriteRenderer>();
+                _volleyMark.sortingOrder = SortingOrders.VolleyMark;
+            }
+
+            _volleyMark.sprite = sprite;
+            _volleyMark.color = color;
+            _volleyMark.enabled = true;
+        }
+
         /// <summary>The checker and its ring always share a sorting order, so the ring moves with it in a stack.</summary>
         private void SetSortingOrder(int sortingOrder)
         {
@@ -194,6 +228,10 @@ namespace Tavla.View
         private void OnMouseDown()
         {
             if (_board == null)
+                return;
+
+            // While a volley waits for its targets a click picks this checker as one, rather than picking it up.
+            if (_board.TryAimVolley(_model))
                 return;
 
             _isDragging = true;

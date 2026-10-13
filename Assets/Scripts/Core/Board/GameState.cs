@@ -27,6 +27,7 @@ namespace Tavla.Core.Board
     ///   GameState.Releases.cs     -> freeing a locked checker by sacrificing a die
     ///   GameState.Sacrifices.cs   -> sacrificing a checker for its ability
     ///   GameState.Captures.cs     -> captures, forced relocation, hook dispatch
+    ///   GameState.Volleys.cs      -> a volley waiting for the player to pick its targets
     ///   GameState.Turns.cs        -> dice bridge, turn flow, rounds, match end
     /// </summary>
     public partial class GameState
@@ -178,12 +179,16 @@ namespace Tavla.Core.Board
 
         /// <summary>
         /// A checker was lost FOR GOOD, not just for this match: in a run it also leaves the player's deck.
-        /// Raised for a checker sacrificed for its ability (Second Chance) and for one a tile destroys outright
-        /// (Powder Keg), after <see cref="CheckerDestroyed"/> and before the match may end. (checker, point index)
+        /// Raised for a checker sacrificed for its ability (Second Chance), for one a tile destroys outright
+        /// (Powder Keg) and for one destroyed when it is captured (Sacrificial), after <see cref="CheckerDestroyed"/>
+        /// and before the match may end. (checker, point index)
         /// </summary>
         public event Action<BaseChecker, int> CheckerLostForGood;
 
-        /// <summary>A checker was forcibly moved to another point (Maelstrom). (checker, old point, new point)</summary>
+        /// <summary>
+        /// A checker was forcibly moved to another point (Maelstrom). (checker, old point, new point)
+        /// One thrown onto a point it may not enter is broken there straight after (<see cref="Abilities.AbilityIds.TeleportCrash"/>).
+        /// </summary>
         public event Action<BaseChecker, int, int> CheckerTeleported;
 
         /// <summary>
@@ -315,10 +320,39 @@ namespace Tavla.Core.Board
                 _nodes[layout.GetPoint(playerId, k)].Push(checkers[k]);
         }
 
+        /// <summary>
+        /// Puts a tile on a point, replacing the one there (<see cref="RemoveTile"/>). Checkers already standing on the
+        /// point are not caught by it: a tile acts on the checkers that land on it.
+        /// </summary>
         public void PlaceTile(int nodeIndex, ITileEffect effect)
         {
-            if (IsOnBoard(nodeIndex))
-                _nodes[nodeIndex].SetTile(effect);
+            if (!IsOnBoard(nodeIndex))
+                return;
+
+            RemoveTile(nodeIndex);
+            _nodes[nodeIndex].SetTile(effect);
+        }
+
+        /// <summary>
+        /// Takes the tile off a point, even mid-match (the sandbox's god mode). The checkers standing there leave its
+        /// effect as if they had walked off: a Fog gives their abilities back, a Swamp forgets their locks.
+        /// </summary>
+        public void RemoveTile(int nodeIndex)
+        {
+            if (!IsOnBoard(nodeIndex) || _nodes[nodeIndex].ActiveTile == null)
+                return;
+
+            Node node = _nodes[nodeIndex];
+
+            // A copy: a tile's hook may change the point.
+            BaseChecker[] standing = new BaseChecker[node.CheckerCount];
+            for (int i = 0; i < standing.Length; i++)
+                standing[i] = node.Checkers[i];
+
+            for (int i = 0; i < standing.Length; i++)
+                NotifyTileLeft(node, standing[i]);
+
+            node.ClearTile();
         }
 
         #endregion

@@ -8,15 +8,15 @@ using Tavla.Core.Runtime;
 namespace Tavla.Core.Tiles
 {
     /// <summary>
-    /// Swamp Tile. "Every checker that lands here has a 50% chance to get stuck (locked).
+    /// Swamp Tile. "Every checker that lands here gets stuck (locked).
     /// Unlocking it requires sacrificing one of the dice on a later turn."
+    /// The GDD gives the lock a 50% chance; the user made it certain (2026-10-13).
     /// The lock is kept PER CHECKER: one checker on the point may be stuck while another is free.
     /// Freeing goes through <see cref="GameState.TryReleaseChecker"/>, which spends the die.
     /// </summary>
     public class SwampTile : BaseTileEffect, IReleasableLock
     {
         public const string Id = "tile_swamp";
-        private const float StickChance = 0.5f;
 
         private readonly HashSet<BaseChecker> _stuck = new HashSet<BaseChecker>();
 
@@ -43,9 +43,6 @@ namespace Tavla.Core.Tiles
 
         public override void OnCheckerLanded(IMatchContext context, Node node, BaseChecker checker)
         {
-            if (!context.Random.Chance(StickChance))
-                return;
-
             _stuck.Add(checker);
             _stuckThisTurn.Add(checker);
             context.Board.ReportAbility(AbilityIds.SwampStuck, checker, node.Index);

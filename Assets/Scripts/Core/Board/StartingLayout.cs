@@ -59,14 +59,19 @@ namespace Tavla.Core.Board
         /// points already taken are at most the side's own earlier stacks and all of the opponent's, so every
         /// side needs twice <see cref="StartingPatterns.MaxStacks"/> free allowed points.
         /// </summary>
-        public static bool HasRoomAround(IReadOnlyCollection<int> blockedPoints)
+        /// <param name="blockedPoints">Points known to be blocked.</param>
+        /// <param name="unplacedPoints">
+        /// More blocked points whose place is not known yet (tiles a run draws at random). Each is counted as taking
+        /// one of every side's free points — the worst case.
+        /// </param>
+        public static bool HasRoomAround(IReadOnlyCollection<int> blockedPoints, int unplacedPoints = 0)
         {
             bool[] blocked = ToBlockedMask(blockedPoints);
             int needed = 2 * StartingPatterns.MaxStacks;
 
             for (int p = 0; p < GameState.PlayerCount; p++)
             {
-                if (CountFreeAllowedPoints(p, blocked) < needed)
+                if (CountFreeAllowedPoints(p, blocked) - unplacedPoints < needed)
                     return false;
             }
 

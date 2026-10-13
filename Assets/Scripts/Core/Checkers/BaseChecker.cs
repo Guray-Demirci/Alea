@@ -25,6 +25,13 @@ namespace Tavla.Core.Checkers
         /// </summary>
         public bool AbilitiesSuppressed { get; private set; }
 
+        /// <summary>
+        /// Set by GameState while a captured checker waits to come back: from the moment it is sent to the bar until
+        /// its entry move is over. Like the Fog, it makes the checker a plain one meanwhile, so its entry triggers
+        /// none of its own abilities (a Bowman entering with a 6 shoots nothing).
+        /// </summary>
+        public bool IsReentering { get; private set; }
+
         protected BaseChecker(int ownerId)
         {
             OwnerId = ownerId;
@@ -33,12 +40,12 @@ namespace Tavla.Core.Checkers
         /// <summary>
         /// ABILITY GATE — the heart of the architecture.
         /// GameState never writes "if (checker is ArmoredChecker)"; instead it asks
-        /// "does this checker have ability X?". The Fog effect is applied here in a single line.
+        /// "does this checker have ability X?". The Fog effect and the bar's are applied here in a single line.
         /// </summary>
         /// <returns>The ability if present, otherwise (or if suppressed) null.</returns>
         public T GetAbility<T>() where T : class, ICheckerAbility
         {
-            if (AbilitiesSuppressed)
+            if (AbilitiesSuppressed || IsReentering)
                 return null;
 
             return this as T;
@@ -48,6 +55,12 @@ namespace Tavla.Core.Checkers
         internal void SetAbilitiesSuppressed(bool suppressed)
         {
             AbilitiesSuppressed = suppressed;
+        }
+
+        /// <summary>Called by GameState when the checker is sent to the bar and once it has entered again.</summary>
+        internal void SetReentering(bool reentering)
+        {
+            IsReentering = reentering;
         }
 
         /// <summary>

@@ -69,3 +69,5 @@ MonoBehaviour:
     Sprite: {fileID: 21300000, guid: 8c1b93e41f134049a6221baa42c35f47, type: 3}
   - Checker: 29
     Sprite: {fileID: 21300000, guid: ac2cb183667e4f5eb260af52abb505a8, type: 3}
+  - Checker: 30
+    Sprite: {fileID: 21300000, guid: ddf9815abe424b79b2d97cacf91f1bfb, type: 3}

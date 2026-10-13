@@ -80,7 +80,8 @@ namespace Tavla.View
             new ItemCode { ItemId = "checker_diceholder", Code = "DH" },
             new ItemCode { ItemId = "checker_kraken", Code = "KR" },
             new ItemCode { ItemId = "checker_mutiny", Code = "MU" },
-            new ItemCode { ItemId = "checker_hammer", Code = "HA" }
+            new ItemCode { ItemId = "checker_hammer", Code = "HA" },
+            new ItemCode { ItemId = "checker_bowman", Code = "BO" }
         };
     }
 }

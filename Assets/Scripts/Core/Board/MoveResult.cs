@@ -23,7 +23,8 @@ namespace Tavla.Core.Board
         // --- Arcade mode ---
         MatchOver,          // Turn counter ran out, the match is closed
         NotInHomeBoard,     // Bear-off attempted from outside the home board
-        NoDieForBearOff     // No die is large enough to cover the remaining distance
+        NoDieForBearOff,    // No die is large enough to cover the remaining distance
+        VolleyPending       // A volley waits for its targets (Bowman); it is fired before anything else
     }
 
     /// <summary>

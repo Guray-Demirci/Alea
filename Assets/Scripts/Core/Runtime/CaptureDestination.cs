@@ -9,7 +9,7 @@ namespace Tavla.Core.Runtime
     {
         Bar = 0,        // Classic rule: goes to the bar
         HomeEntry = 1,  // Phoenix Checker: returns to its own starting point (the next free one if it is full)
-        Destroyed = 2,  // Sacrificial Checker / Powder Keg: removed from the game entirely
+        Destroyed = 2,  // Sacrificial Checker: removed from play for good — in a run, from the deck as well
         Converted = 3   // Captured by the Mutiny Checker: leaves play, a checker of the capturer takes its place
     }
 }

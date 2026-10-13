@@ -40,6 +40,12 @@ namespace Tavla.Core.Run
         private readonly Dictionary<BaseChecker, DeckEntry> _fieldedEntries = new Dictionary<BaseChecker, DeckEntry>();
         private readonly List<DeckEntry> _lostEntries = new List<DeckEntry>();
 
+        // The board's tiles, one slot per point, and what the random draws may still bring and where.
+        private readonly TilePlacement[] _tilesByPoint = new TilePlacement[GameState.NodeCount];
+        private readonly List<Func<ITileEffect>> _drawableTiles;
+        private readonly List<int> _drawablePoints;
+        private TilePlacement[] _tiles = Array.Empty<TilePlacement>();
+
         public RunDefinition Definition { get; }
 
         /// <summary>The player who chases the targets. The other seat is the opponent.</summary>
@@ -65,8 +71,8 @@ namespace Tavla.Core.Run
         /// <summary>
         /// The checkers the player fields in every match; where they start is dealt anew by <see cref="StartingLayout"/>.
         /// Starts with <see cref="RunDefinition.StartingCheckers"/> default checkers. <see cref="AddToDeck"/> adds to it;
-        /// a checker lost for good — sacrificed for its ability (Second Chance) or blown up by a Powder Keg — leaves it
-        /// when its match ends. A match deals at least <see cref="GameState.MinCheckersPerPlayer"/> checkers a side,
+        /// a checker lost for good — sacrificed for its ability (Second Chance), blown up by a Powder Keg or a captured
+        /// Sacrificial Checker — leaves it when its match ends. A match deals at least <see cref="GameState.MinCheckersPerPlayer"/> checkers a side,
         /// so plain checkers fill the deck back up to that. It holds at most one of each special checker.
         /// </summary>
         public IReadOnlyList<DeckEntry> Deck => _deck;
@@ -89,6 +95,15 @@ namespace Tavla.Core.Run
 
         /// <summary>Cards and charms the player owns. A card leaves once its charges are used up.</summary>
         public IReadOnlyList<BaseRelic> Relics => _relics;
+
+        /// <summary>
+        /// Every tile on the board in the current stage, ordered by point: the stages' own tiles
+        /// (<see cref="RunDefinition.GetTileLayout"/>) and the ones drawn at random. A stage's
+        /// <see cref="StageDefinition.RandomTileCount"/> tiles are drawn as the run enters it — when the previous
+        /// stage's last match is won — from the pool tiles not on the board yet, each on a random point no stage
+        /// places a tile on. So a tile never comes twice in a run.
+        /// </summary>
+        public IReadOnlyList<TilePlacement> Tiles => _tiles;
 
         /// <summary>Gold taken off every shop price for the rest of the run (Sacrificial Checker).</summary>
         public int ShopDiscount { get; private set; }
@@ -146,7 +161,45 @@ namespace Tavla.Core.Run
 
             for (int i = 0; i < definition.StartingCheckers; i++)
                 _deck.Add(new DeckEntry(DefaultChecker.Id, CreateDefaultChecker));
+
+            _drawableTiles = new List<Func<ITileEffect>>(definition.DrawableTiles);
+            _drawablePoints = new List<int>(definition.DrawablePoints);
+            PlaceStageTiles();
         }
+
+        #region Tiles
+
+        /// <summary>
+        /// Puts the current stage's tiles on the board: its own on top of what earlier stages left, then its random
+        /// draws. <see cref="RunDefinition"/> has already checked that enough tiles and points are left for them.
+        /// </summary>
+        private void PlaceStageTiles()
+        {
+            IReadOnlyList<TilePlacement> newTiles = CurrentStage.NewTiles;
+            for (int t = 0; t < newTiles.Count; t++)
+                _tilesByPoint[newTiles[t].Point] = newTiles[t];
+
+            for (int i = 0; i < CurrentStage.RandomTileCount; i++)
+            {
+                int tile = _random.Range(0, _drawableTiles.Count);
+                int point = _drawablePoints[_random.Range(0, _drawablePoints.Count)];
+
+                _tilesByPoint[point] = new TilePlacement(point, _drawableTiles[tile]);
+                _drawableTiles.RemoveAt(tile);
+                _drawablePoints.Remove(point);
+            }
+
+            List<TilePlacement> tiles = new List<TilePlacement>(GameState.NodeCount);
+            for (int p = 0; p < _tilesByPoint.Length; p++)
+            {
+                if (_tilesByPoint[p] != null)
+                    tiles.Add(_tilesByPoint[p]);
+            }
+
+            _tiles = tiles.ToArray();
+        }
+
+        #endregion
 
         #region Deck and relics
 
@@ -256,7 +309,7 @@ namespace Tavla.Core.Run
 
         /// <summary>
         /// Builds the next match of the run: the player's deck against the opponent's default checkers on a freshly
-        /// dealt <see cref="StartingLayout"/>, the stage's tiles (fresh instances, on points the layout kept free),
+        /// dealt <see cref="StartingLayout"/>, the <see cref="Tiles"/> (fresh instances, on points the layout kept free),
         /// the player's relics on the player's dice and the player's gold. Everything is built before the run
         /// changes, so a failure leaves the run untouched.
         /// </summary>
@@ -274,7 +327,6 @@ namespace Tavla.Core.Run
 
             MatchDefinition definition = CurrentMatch;
             int opponentId = GameState.GetOpponent(PlayerId);
-            IReadOnlyList<TilePlacement> tiles = Definition.GetTileLayout(StageIndex);
 
             MatchRules rules = MatchRules.ForTarget(definition.TargetScore, definition.TurnLimit,
                                                     Definition.FinalStretchTurns, PlayerId);
@@ -285,14 +337,14 @@ namespace Tavla.Core.Run
             checkerCounts[PlayerId] = _deck.Count;
             checkerCounts[opponentId] = definition.OpponentCheckers;
             StartingLayout layout = StartingLayout.Deal(checkerCounts[0], checkerCounts[1], _random,
-                                                        TilePlacement.GetPoints(tiles));
+                                                        TilePlacement.GetPoints(_tiles));
 
             BaseChecker[] playerCheckers = CreatePlayerCheckers();
             board.SetupPlayer(PlayerId, playerCheckers, layout);
             board.SetupPlayer(opponentId, CreateDefaultCheckers(opponentId, definition.OpponentCheckers), layout);
 
-            for (int i = 0; i < tiles.Count; i++)
-                board.PlaceTile(tiles[i].Point, tiles[i].CreateTile());
+            for (int i = 0; i < _tiles.Length; i++)
+                board.PlaceTile(_tiles[i].Point, _tiles[i].CreateTile());
 
             // Charms work on every roll; cards only on the roll they are armed for.
             for (int i = 0; i < _relics.Count; i++)
@@ -349,8 +401,9 @@ namespace Tavla.Core.Run
             match.Board.CheckerLostForGood -= HandleCheckerLostForGood;
             ActiveMatch = null;
 
-            // Checkers lost for good (a sacrificed Second Chance, a Powder Keg's victim) leave the deck. A side still
-            // fields the fewest checkers a match can deal, so plain checkers fill any gap below that.
+            // Checkers lost for good (a sacrificed Second Chance, a Powder Keg's victim, a captured Sacrificial Checker)
+            // leave the deck. A side still fields the fewest checkers a match can deal, so plain checkers fill any gap
+            // below that.
             for (int i = 0; i < _lostEntries.Count; i++)
                 _deck.Remove(_lostEntries[i]);
 
@@ -425,6 +478,7 @@ namespace Tavla.Core.Run
 
             StageIndex++;
             MatchIndex = 0;
+            PlaceStageTiles();
         }
 
         #endregion

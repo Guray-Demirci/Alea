@@ -9,6 +9,7 @@ using UnityEngine;
 #if TAVLA_NEW_INPUT
 using UnityEngine.InputSystem;
 #endif
+using Tavla.Core.Abilities;
 using Tavla.Core.AI;
 using Tavla.Core.Board;
 using Tavla.Core.Checkers;
@@ -31,7 +32,8 @@ namespace Tavla.View
     /// KEY DESIGN: checker positions are NOT computed from move data. After every event
     /// RefreshBoard() re-reads the board from the model's current state. That is why the Doomsday
     /// Checker's mass capture, the Maelstrom's teleport, the Phoenix's return and 30 other special
-    /// cases need not a single extra line of View code.
+    /// cases need not a single extra line of View code. The one exception is a checker the Maelstrom breaks on a made
+    /// point: it is held there for a moment (<see cref="Crash"/>), so the player sees it land before it is broken.
     /// </summary>
     public class BoardManager : MonoBehaviour
     {
@@ -77,6 +79,21 @@ namespace Tavla.View
         [Tooltip("Tint of the mark. White keeps an assigned sprite's own colours.")]
         [SerializeField] private Color _markColor = new Color(0.35f, 0.95f, 0.85f, 1f);
 
+        [Header("Volley (Bowman)")]
+        [Tooltip("Drawn over every checker the human's waiting volley can hit, while they pick its targets by clicking " +
+                 "them. Empty = built-in corners around the checker.")]
+        [SerializeField] private Sprite _volleyTargetSprite;
+        [Tooltip("Tint of the target mark. White keeps an assigned sprite's own colours.")]
+        [SerializeField] private Color _volleyTargetColor = new Color(1f, 0.45f, 0.35f, 0.8f);
+        [Tooltip("Drawn over a checker picked as a target; clicking it again drops it. The volley fires on the last " +
+                 "pick. Empty = built-in corners with a cross.")]
+        [SerializeField] private Sprite _volleyAimedSprite;
+        [Tooltip("Tint of the picked mark. White keeps an assigned sprite's own colours.")]
+        [SerializeField] private Color _volleyAimedColor = new Color(1f, 0.2f, 0.15f, 1f);
+        [Tooltip("The info panel's task line while the human picks a volley's targets. {0} = targets left to pick. " +
+                 "Keep it as short as the turn counter it replaces.")]
+        [SerializeField] private string _volleyTask = "SHOOT {0}";
+
         [Header("Prefabs (optional)")]
         [Tooltip("If set, checkers are spawned from this prefab; otherwise they are built in code from the sprite above.")]
         [SerializeField] private CheckerController _checkerPrefab;
@@ -103,6 +120,9 @@ namespace Tavla.View
         [Tooltip("The tiles' art (Create > Tavla > Tile Art): a point carrying a tile is drawn as that tile, and turns into " +
                  "it when the tile appears. Empty = tiles are not drawn; they still work.")]
         [SerializeField] private TileArtSet _tileArt;
+        [Tooltip("A checker the Maelstrom throws onto a point it may not enter (a made point) first goes there, and is " +
+                 "broken this long after it arrives (seconds).")]
+        [SerializeField, Min(0f)] private float _crashDelay = 0.5f;
 
         [Header("Info panel")]
         [Tooltip("Presenter that writes score/gold/moves on the left panel. If empty it is searched for in " +
@@ -191,6 +211,33 @@ namespace Tavla.View
         // Reused for every drag highlight so picking up a checker does not allocate.
         private readonly List<int> _legalTargets = new List<int>(GameState.NodeCount);
 
+        // The targets the human has picked so far for their waiting volley (Bowman), and whether the task line shows it.
+        private readonly List<BaseChecker> _volleyPicks = new List<BaseChecker>();
+        private bool _showingVolleyTask;
+
+        // The volley marks in use: the assigned sprites, or built-in ones made in BuildScene.
+        private Sprite _volleyTargetMark;
+        private Sprite _volleyAimedMark;
+
+        // Checkers still shown on the point they crashed onto, in the order they crashed.
+        private readonly List<Crash> _crashes = new List<Crash>();
+
+        /// <summary>
+        /// A checker thrown onto a point it may not enter (<see cref="AbilityIds.TeleportCrash"/>). Core has already
+        /// broken it; the View keeps showing it on that point until it has arrived there and the crash delay has passed.
+        /// </summary>
+        private sealed class Crash
+        {
+            public BaseChecker Checker;
+            public CheckerController View;
+            public int Point;
+
+            /// <summary>Core destroyed it as it broke (Sacrificial): its visual goes once the crash has been shown.</summary>
+            public bool Destroyed;
+
+            public Coroutine Routine;
+        }
+
         // _nodeViews is addressed by point index (0-23); the bear-off target is not part of that list.
         private NodeView _bearOffView;
 
@@ -201,6 +248,8 @@ namespace Tavla.View
         private bool _ownsLayout;
         private Sprite _solidSprite;
         private Sprite _builtInMarkSprite;
+        private Sprite _builtInVolleyTarget;
+        private Sprite _builtInVolleyAimed;
 
         public GameState Board => _gameState;
         public MatchContext Match => _context;
@@ -315,12 +364,27 @@ namespace Tavla.View
             ClearHighlights();
             Unsubscribe();
 
+            // The checkers the picks name leave with the match; the next match's HUD binding rewrites the task line.
+            _volleyPicks.Clear();
+            _showingVolleyTask = false;
+
             if (_diceCards != null)
                 _diceCards.Unbind();
 
             // The marks belong to the match that left them.
             for (int i = 0; i < _nodeViews.Count; i++)
                 _nodeViews[i].SetMarked(false);
+
+            // A crash still showing ends with the match; a destroyed checker's visual is no longer among the views below.
+            for (int i = 0; i < _crashes.Count; i++)
+            {
+                if (_crashes[i].Routine != null)
+                    StopCoroutine(_crashes[i].Routine);
+                if (_crashes[i].Destroyed)
+                    Destroy(_crashes[i].View.gameObject);
+            }
+
+            _crashes.Clear();
 
             foreach (CheckerController view in _checkerViews.Values)
                 Destroy(view.gameObject);
@@ -540,6 +604,14 @@ namespace Tavla.View
                                                              markSprite, _markColor));
             _bearOffView = BoardSceneBuilder.SpawnBearOffTarget(_layout, _solidSprite, _bearOffTrayColor);
 
+            _volleyTargetMark = _volleyTargetSprite;
+            if (_volleyTargetMark == null)
+                _volleyTargetMark = _builtInVolleyTarget = BoardSceneBuilder.CreateTargetSprite(_layout.PixelsPerUnit);
+
+            _volleyAimedMark = _volleyAimedSprite;
+            if (_volleyAimedMark == null)
+                _volleyAimedMark = _builtInVolleyAimed = BoardSceneBuilder.CreateAimedSprite(_layout.PixelsPerUnit);
+
             // The checkers belong to a match; BeginMatch spawns them.
             _checkerRoot = BoardSceneBuilder.CreateWorldRoot("Checkers");
 
@@ -685,6 +757,8 @@ namespace Tavla.View
             _gameState.CheckerAdded += HandleCheckerAdded;
             _gameState.CheckerReleased += HandleCheckerReleased;
             _gameState.CheckerSacrificed += HandleCheckerSacrificed;
+            _gameState.VolleyFired += HandleVolleyFired;
+            _gameState.AbilityTriggered += HandleAbilityTriggered;
             _gameState.TurnChanged += HandleTurnChanged;
             _gameState.MatchEnded += HandleMatchEnded;
 
@@ -727,25 +801,26 @@ namespace Tavla.View
             }
 
             // Runtime-created textures/sprites/assets are not garbage collected by Unity; release them explicitly.
-            if (_solidSprite != null)
-            {
-                Destroy(_solidSprite.texture);
-                Destroy(_solidSprite);
-                _solidSprite = null;
-            }
-
-            if (_builtInMarkSprite != null)
-            {
-                Destroy(_builtInMarkSprite.texture);
-                Destroy(_builtInMarkSprite);
-                _builtInMarkSprite = null;
-            }
+            DestroyRuntimeSprite(ref _solidSprite);
+            DestroyRuntimeSprite(ref _builtInMarkSprite);
+            DestroyRuntimeSprite(ref _builtInVolleyTarget);
+            DestroyRuntimeSprite(ref _builtInVolleyAimed);
 
             if (_ownsLayout && _layout != null)
             {
                 Destroy(_layout);
                 _layout = null;
             }
+        }
+
+        private static void DestroyRuntimeSprite(ref Sprite sprite)
+        {
+            if (sprite == null)
+                return;
+
+            Destroy(sprite.texture);
+            Destroy(sprite);
+            sprite = null;
         }
 
         /// <summary>Disconnects from the current match. Safe to call more than once.</summary>
@@ -761,6 +836,8 @@ namespace Tavla.View
                 _gameState.CheckerAdded -= HandleCheckerAdded;
                 _gameState.CheckerReleased -= HandleCheckerReleased;
                 _gameState.CheckerSacrificed -= HandleCheckerSacrificed;
+                _gameState.VolleyFired -= HandleVolleyFired;
+                _gameState.AbilityTriggered -= HandleAbilityTriggered;
                 _gameState.TurnChanged -= HandleTurnChanged;
                 _gameState.MatchEnded -= HandleMatchEnded;
             }
@@ -783,6 +860,13 @@ namespace Tavla.View
         /// </summary>
         public void RequestMove(BaseChecker checker, int toIndex)
         {
+            // Still shown on the point it crashed onto, not where Core has put it: it may play once it is there.
+            if (IsCrashing(checker))
+            {
+                RefreshBoard();
+                return;
+            }
+
             if (toIndex == GetSourceIndex(checker))
             {
                 // Not a move. If Core refuses, the checker left hanging after the drag must snap back.
@@ -813,6 +897,9 @@ namespace Tavla.View
         {
             ClearHighlights();
 
+            if (IsCrashing(checker))
+                return;
+
             _gameState.GetLegalTargets(checker, _legalTargets);
             for (int i = 0; i < _legalTargets.Count; i++)
                 _nodeViews[_legalTargets[i]].SetHighlight(true);
@@ -832,6 +919,29 @@ namespace Tavla.View
 
             if (_legalTargets.Count == 0 && !canBearOff && !canActInPlace)
                 GameLog.Info($"[View] No legal move for {checker.TypeId} on point {fromIndex} with these dice.");
+        }
+
+        /// <summary>
+        /// Called by a CheckerController when it is clicked. While a human's volley waits for its targets (Bowman) the
+        /// click picks the checker as one, or drops it if it was picked, and returns true: the checker is not picked
+        /// up. The volley fires on the last pick it needs. Returns false when no volley waits.
+        /// </summary>
+        public bool TryAimVolley(BaseChecker checker)
+        {
+            if (!IsAimingVolley)
+                return false;
+
+            if (!_volleyPicks.Remove(checker) && _gameState.CanVolleyTarget(checker))
+            {
+                _volleyPicks.Add(checker);
+
+                // Once fired, VolleyFired redraws the board.
+                if (_volleyPicks.Count >= _gameState.PendingVolleySize && _gameState.TryFireVolley(_volleyPicks.ToArray()))
+                    return true;
+            }
+
+            RefreshVolley();
+            return true;
         }
 
         public void ClearHighlights()
@@ -893,9 +1003,11 @@ namespace Tavla.View
 
                 // The total count is passed as well: for large stacks BoardLayout shrinks the spacing
                 // to keep the checkers inside the triangle (15 checkers can now share one point).
+                // A checker still crashing onto the point counts too, drawn on top by PlaceCrashes.
                 int count = node.CheckerCount;
+                int shown = count + CountCrashesOn(i, _crashes.Count);
                 for (int k = 0; k < count; k++)
-                    PlaceChecker(node.Checkers[k], _layout.GetCheckerPosition(i, k, count),
+                    PlaceChecker(node.Checkers[k], _layout.GetCheckerPosition(i, k, shown),
                                  SortingOrders.CheckerBase + k, instant);
             }
 
@@ -907,16 +1019,18 @@ namespace Tavla.View
                                  SortingOrders.BarCheckerBase + k, instant);
             }
 
+            PlaceCrashes(instant);
             RefreshMarks();
             RefreshTiles();
             RefreshMovableCheckers();
+            RefreshVolley();
         }
 
         /// <summary>
         /// Shows the tiles on the points. The view remembers what it showed, across matches too, so only a point whose
         /// tile came or went turns over: a new match of the same stage keeps its tiles still, while the stage that adds
-        /// one, a fresh sandbox deal or a Spike Pit breaking mid-match plays the change. Always animated, even when
-        /// <see cref="RefreshBoard"/> snaps the checkers.
+        /// one, a fresh sandbox deal or a tile put on or taken off in the sandbox mid-match plays the change. Always
+        /// animated, even when <see cref="RefreshBoard"/> snaps the checkers.
         /// </summary>
         private void RefreshTiles()
         {
@@ -925,8 +1039,10 @@ namespace Tavla.View
 
             for (int i = 0; i < GameState.NodeCount; i++)
             {
+                // A Dungeon opens or closes as a round ends, and the next turn's roll redraws the board: in step.
                 ITileEffect tile = _gameState.Nodes[i].ActiveTile;
-                _tiles.Show(i, tile != null ? tile.EffectId : null);
+                IOpenCloseTile gate = tile as IOpenCloseTile;
+                _tiles.Show(i, tile != null ? tile.EffectId : null, gate != null && gate.IsOpen);
 
                 // A countdown drops as a turn ends, and the next turn's roll redraws the board: always in step.
                 ICountdownTile countdown = tile as ICountdownTile;
@@ -956,7 +1072,90 @@ namespace Tavla.View
             bool humanCanPlay = _gameState != null && _context.CurrentRoll != null && IsHumanTurn;
 
             foreach (CheckerController view in _checkerViews.Values)
-                view.SetMovable(humanCanPlay && _gameState.CanPlayChecker(view.Model));
+                view.SetMovable(humanCanPlay && !IsCrashing(view.Model) && _gameState.CanPlayChecker(view.Model));
+        }
+
+        /// <summary>
+        /// Draws every checker still crashing on top of the point it was thrown onto — wherever Core has put it since
+        /// (the bar, its starting point) or even if Core has destroyed it.
+        /// </summary>
+        private void PlaceCrashes(bool instant)
+        {
+            for (int i = 0; i < _crashes.Count; i++)
+            {
+                Crash crash = _crashes[i];
+                int count = _gameState.Nodes[crash.Point].CheckerCount;
+                int k = count + CountCrashesOn(crash.Point, i);
+                int shown = count + CountCrashesOn(crash.Point, _crashes.Count);
+
+                crash.View.SetTarget(_layout.GetCheckerPosition(crash.Point, k, shown), SortingOrders.CheckerBase + k);
+                if (instant)
+                    crash.View.SnapToTarget();
+            }
+        }
+
+        /// <summary>How many of the first <paramref name="crashCount"/> crashes are on this point.</summary>
+        private int CountCrashesOn(int point, int crashCount)
+        {
+            int found = 0;
+            for (int i = 0; i < crashCount; i++)
+            {
+                if (_crashes[i].Point == point)
+                    found++;
+            }
+
+            return found;
+        }
+
+        private bool IsCrashing(BaseChecker checker)
+        {
+            return FindCrash(checker) != null;
+        }
+
+        private Crash FindCrash(BaseChecker checker)
+        {
+            for (int i = 0; i < _crashes.Count; i++)
+            {
+                if (ReferenceEquals(_crashes[i].Checker, checker))
+                    return _crashes[i];
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// While a human's volley waits for its targets (Bowman): marks every checker it can hit and the ones picked so
+        /// far, and shows on the task line how many are left to pick. Which checkers can be hit is Core's answer
+        /// (CanVolleyTarget). Once nothing waits the marks go and the task line shows the turns again.
+        /// </summary>
+        private void RefreshVolley()
+        {
+            bool aiming = IsAimingVolley;
+
+            if (!aiming)
+                _volleyPicks.Clear();
+            else
+                _volleyPicks.RemoveAll(picked => !_gameState.CanVolleyTarget(picked));
+
+            foreach (CheckerController view in _checkerViews.Values)
+            {
+                if (aiming && _volleyPicks.Contains(view.Model))
+                    view.SetVolleyMark(_volleyAimedMark, _volleyAimedColor);
+                else if (aiming && _gameState.CanVolleyTarget(view.Model))
+                    view.SetVolleyMark(_volleyTargetMark, _volleyTargetColor);
+                else
+                    view.SetVolleyMark(null, Color.clear);
+            }
+
+            if (_hud != null)
+            {
+                if (aiming)
+                    _hud.SetTask(string.Format(_volleyTask, _gameState.PendingVolleySize - _volleyPicks.Count));
+                else if (_showingVolleyTask && !_gameState.IsMatchOver) // A finished match shows its result there.
+                    _hud.RefreshAll();
+            }
+
+            _showingVolleyTask = aiming;
         }
 
         private void PlaceChecker(BaseChecker model, Vector3 position, int sortingOrder, bool instant)
@@ -989,7 +1188,13 @@ namespace Tavla.View
             if (_checkerViews.TryGetValue(checker, out view))
             {
                 _checkerViews.Remove(checker);
-                Destroy(view.gameObject);
+
+                // A checker destroyed as it crashed (Sacrificial) is still to be seen arriving; ShowCrash removes it.
+                Crash crash = FindCrash(checker);
+                if (crash != null)
+                    crash.Destroyed = true;
+                else
+                    Destroy(view.gameObject);
             }
         }
 
@@ -1025,6 +1230,46 @@ namespace Tavla.View
             ScheduleAutoEndCheck();
         }
 
+        private void HandleVolleyFired(BaseChecker shooter, IReadOnlyList<BaseChecker> targets)
+        {
+            // The targets went to the bar (or home, or out of play) and play goes on with the dice left.
+            RefreshBoard();
+            ScheduleAutoEndCheck();
+        }
+
+        /// <summary>
+        /// A checker thrown onto a point it may not enter (the Maelstrom flinging it onto a made point) has crashed
+        /// there: Core broke it at once, but the View shows it reach that point first (<see cref="ShowCrash"/>).
+        /// </summary>
+        private void HandleAbilityTriggered(string abilityId, BaseChecker checker, int nodeIndex)
+        {
+            CheckerController view;
+            if (abilityId != AbilityIds.TeleportCrash || !_checkerViews.TryGetValue(checker, out view))
+                return;
+
+            Crash crash = new Crash { Checker = checker, View = view, Point = nodeIndex };
+            _crashes.Add(crash);
+            crash.Routine = StartCoroutine(ShowCrash(crash));
+        }
+
+        /// <summary>Holds a crashed checker on its point until it has got there and the crash delay has passed.</summary>
+        private IEnumerator ShowCrash(Crash crash)
+        {
+            // The crash is reported mid-move; the move's own RefreshBoard sends the checker to the point.
+            yield return null;
+
+            while (!crash.View.IsAtTarget)
+                yield return null;
+
+            yield return new WaitForSeconds(_crashDelay);
+
+            _crashes.Remove(crash);
+            if (crash.Destroyed)
+                Destroy(crash.View.gameObject);
+
+            RefreshBoard();
+        }
+
         private void HandleTurnChanged(int playerId)
         {
             _context.RollDice(playerId);
@@ -1038,6 +1283,7 @@ namespace Tavla.View
             StopBotTurn();
             CancelAutoEnd();
             RefreshMovableCheckers();
+            RefreshVolley();
 
             // A keg's blast can end the match as a turn ends, with no roll after it to redraw its count.
             RefreshTiles();
@@ -1090,6 +1336,10 @@ namespace Tavla.View
 
                 moveCount++;
                 yield return new WaitForSeconds(_botMoveDelay);
+
+                // A checker crashing where the Maelstrom threw it is seen broken before anything else happens.
+                while (_crashes.Count > 0)
+                    yield return null;
             }
 
             // Clear before the routine ends: EndTurn will start a new turn and overwrite this field.
@@ -1108,6 +1358,9 @@ namespace Tavla.View
 
         /// <summary>Is this seat played by hand right now? With the bot disabled both are.</summary>
         private bool IsHuman(int playerId) => _bot == null || playerId != _botPlayerId;
+
+        /// <summary>Is a volley waiting for the human to pick its targets? The bot fires its own in its turn routine.</summary>
+        private bool IsAimingVolley => _gameState != null && IsHumanTurn && _gameState.HasPendingVolley;
 
         /// <summary>
         /// Schedules a check whether the human player still has a move. Called after every move and every
@@ -1141,6 +1394,10 @@ namespace Tavla.View
         private IEnumerator AutoEndTurnWhenStuck(int playerId)
         {
             yield return new WaitForSeconds(_autoEndDelay);
+
+            // A checker crashing where the Maelstrom threw it is seen broken before the turn passes.
+            while (_crashes.Count > 0)
+                yield return null;
 
             // Clear before the routine ends: EndTurn may start a new turn and overwrite this field.
             _autoEndRoutine = null;

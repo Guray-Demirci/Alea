@@ -169,11 +169,42 @@ namespace Tavla.Core.AI
         }
 
         /// <summary>
+        /// Picks the targets of the volley waiting for them (Bowman): the opponent's checkers closest to bearing off,
+        /// whose capture costs them the most ground. Empty when no volley of the bot's waits.
+        /// </summary>
+        public List<BaseChecker> ChooseVolleyTargets(GameState board)
+        {
+            List<BaseChecker> targets = new List<BaseChecker>();
+            if (board == null || board.CurrentPlayerId != _myPlayerId)
+                return targets;
+
+            List<BaseChecker> hittable = new List<BaseChecker>();
+            board.GetVolleyTargets(hittable);
+            int size = board.PendingVolleySize;
+
+            // Closest to bearing off first; equally advanced ones in the board's order, so the choice is reproducible.
+            for (int distance = 1; distance <= GameState.NodeCount && targets.Count < size; distance++)
+            {
+                for (int i = 0; i < hittable.Count && targets.Count < size; i++)
+                {
+                    if (GameState.GetBearOffDistance(board.FindNodeIndexOf(hittable[i]), _opponentId) == distance)
+                        targets.Add(hittable[i]);
+                }
+            }
+
+            return targets;
+        }
+
+        /// <summary>
         /// Plays the best move on the REAL board. Returns false when no move is left —
-        /// the caller uses this as the "end the turn" signal.
+        /// the caller uses this as the "end the turn" signal. A volley waiting for its targets is fired first:
+        /// nothing else can be played before it.
         /// </summary>
         public bool PlayOneMove(GameState board)
         {
+            if (board != null && board.HasPendingVolley)
+                return board.TryFireVolley(ChooseVolleyTargets(board));
+
             BotMove move = ChooseBestMove(board);
             if (!move.IsValid)
                 return false;

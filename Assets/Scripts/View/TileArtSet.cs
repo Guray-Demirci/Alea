@@ -10,6 +10,8 @@ namespace Tavla.View
     /// turned into it: the whole triangle, 10x56, pivoted on its centre, which is where
     /// <see cref="BoardLayout.GetNodeCenter"/> puts it. The art is drawn for the bottom row (base down); the top row
     /// shows it turned half round, as points.png does with its triangles. A kind missing here leaves its point plain.
+    /// A tile that opens and closes (Dungeon) looks open on one frame of its transition (<see cref="GetOpenFrame"/>) and
+    /// closed at rest.
     ///
     /// The art is keyed by the dropdown kind for the Inspector, and looked up by <see cref="ITileEffect.EffectId"/>
     /// on the board; <see cref="TileCatalog"/> connects the two.
@@ -29,8 +31,13 @@ namespace Tavla.View
                      "first to last. Played backwards when the tile leaves.")]
             public Sprite[] FromLight = new Sprite[0];
 
-            [Tooltip("The same for a dark point.")]
+            [Tooltip("The same for a dark point. Empty = on a dark point the tile appears at once.")]
             public Sprite[] FromDark = new Sprite[0];
+
+            [Tooltip("For a tile that opens and closes (Dungeon): which frame of From Light / From Dark shows it open, " +
+                     "counting from 1. The frames after it close it; the Point is the tile closed. " +
+                     "0 = the tile always looks the same.")]
+            [Min(0)] public int OpenFrame;
         }
 
         [Tooltip("The art of each tile kind. Each kind may be listed once.")]
@@ -44,7 +51,10 @@ namespace Tavla.View
 
         public float FrameSeconds => _frameSeconds;
 
-        /// <summary>Does every kind listed here have its point and both transitions, with no frame missing?</summary>
+        /// <summary>
+        /// Does every kind listed here have its point and both transitions, with no frame missing, and an open frame
+        /// both transitions have?
+        /// </summary>
         public bool IsComplete
         {
             get
@@ -55,6 +65,9 @@ namespace Tavla.View
                 foreach (Entry entry in _tiles)
                 {
                     if (entry == null || entry.Point == null || !IsWhole(entry.FromLight) || !IsWhole(entry.FromDark))
+                        return false;
+
+                    if (entry.OpenFrame > entry.FromLight.Length || entry.OpenFrame > entry.FromDark.Length)
                         return false;
                 }
 
@@ -80,6 +93,16 @@ namespace Tavla.View
                 return null;
 
             return fromLight ? entry.FromLight : entry.FromDark;
+        }
+
+        /// <summary>
+        /// For a tile that opens and closes: which frame of its transitions shows it open, counting from 1; the frames
+        /// after it close it. 0 for a tile that always looks the same, no tile, or a tile without art.
+        /// </summary>
+        public int GetOpenFrame(string effectId)
+        {
+            Entry entry = Find(effectId);
+            return entry != null ? entry.OpenFrame : 0;
         }
 
         private Entry Find(string effectId)

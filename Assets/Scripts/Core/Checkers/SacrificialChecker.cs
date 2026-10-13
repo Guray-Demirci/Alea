@@ -5,7 +5,8 @@ namespace Tavla.Core.Checkers
 {
     /// <summary>
     /// Sacrificial Checker. "When the opponent captures this checker it does not go to the bar, it is DESTROYED.
-    /// In exchange every item in the shop becomes permanently 1 gold cheaper."
+    /// In exchange every item in the shop becomes permanently 1 gold cheaper." Destroyed for good: in a run it
+    /// also leaves the player's deck once the match ends.
     /// Two responsibilities, two interfaces:
     ///   <see cref="ICustomCaptureDestination"/> -> WHERE it goes
     ///   <see cref="ICaptureReactor"/>           -> what the SIDE EFFECT is

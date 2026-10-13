@@ -37,18 +37,6 @@ namespace Tavla.Core.Tests
         }
 
         [Test]
-        public void ResetTurnScore_RemovesOnlyThisTurnsScore()
-        {
-            _context.AddScore(0, 10);
-            _context.RollDice(0); // New turn.
-            _context.AddScore(0, 5);
-
-            _context.ResetTurnScore(0);
-
-            Assert.AreEqual(10, _context.GetScore(0));
-        }
-
-        [Test]
         public void PinNextDie_IsAppliedToTheNextRollOnly()
         {
             _context.PinNextDie(0, 4);

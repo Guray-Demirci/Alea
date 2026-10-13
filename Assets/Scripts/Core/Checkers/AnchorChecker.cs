@@ -18,7 +18,8 @@ namespace Tavla.Core.Checkers
             if (!isMover)
                 return;
 
-            // Measured by the rules engine from the real origin, so entering from the bar counts too.
+            // Measured by the rules engine from the real origin. An entry from the bar pins nothing: a captured
+            // checker enters as a plain one (BaseChecker.IsReentering).
             int distance = result.Distance;
 
             // A die cannot show more than 6 — e.g. a distance stretched by another ability is not pinned.

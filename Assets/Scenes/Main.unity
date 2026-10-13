@@ -167,6 +167,13 @@ MonoBehaviour:
   _backgroundSprite: {fileID: 21300000, guid: c29f4812d1414dd2821f4b2770d75a83, type: 3}
   _pointsSprite: {fileID: 21300000, guid: b84b7cdf653766efc54321a2f9706837, type: 3}
   _pointHighlightSprite: {fileID: 21300000, guid: 951e839bd42ae55282ad24cbd56e62d7, type: 3}
+  _markSprite: {fileID: 0}
+  _markColor: {r: 0.35, g: 0.95, b: 0.85, a: 1}
+  _volleyTargetSprite: {fileID: 0}
+  _volleyTargetColor: {r: 1, g: 0.45, b: 0.35, a: 0.8}
+  _volleyAimedSprite: {fileID: 0}
+  _volleyAimedColor: {r: 1, g: 0.2, b: 0.15, a: 1}
+  _volleyTask: SHOOT {0}
   _checkerPrefab: {fileID: 0}
   _nodePrefab: {fileID: 0}
   _player0Color: {r: 1, g: 1, b: 1, a: 1}
@@ -273,6 +280,8 @@ MonoBehaviour:
       Code: MU
     - ItemId: checker_hammer
       Code: HA
+    - ItemId: checker_bowman
+      Code: BO
   _targetScore: 0
   _turnLimit: 30
   _finalStretchTurns: 3

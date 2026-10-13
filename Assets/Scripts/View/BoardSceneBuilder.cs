@@ -164,14 +164,12 @@ namespace Tavla.View
         }
 
         /// <summary>
-        /// The built-in score mark: a pair of footprints, one texel per canvas pixel, white so the tint colours it.
-        /// Width and height are even, so the centred pivot lands on a pixel edge and the mark stays pixel-exact.
+        /// The built-in score mark: a pair of footprints, white so the tint colours it.
         /// The caller owns it and its texture, and destroys both when done.
         /// </summary>
         public static Sprite CreateFootprintSprite(float pixelsPerUnit)
         {
-            string[] rows =
-            {
+            return CreatePatternSprite("Footprints", pixelsPerUnit,
                 "......XX",
                 ".....XXX",
                 ".....XXX",
@@ -179,18 +177,70 @@ namespace Tavla.View
                 "XXX...X.",
                 "XXX.....",
                 ".XX.....",
-                ".X......"
-            };
+                ".X......");
+        }
 
+        /// <summary>
+        /// The built-in mark of a checker a volley can hit (Bowman): four corners around the 12-pixel disc, white so the
+        /// tint colours it. The caller owns it and its texture, and destroys both when done.
+        /// </summary>
+        public static Sprite CreateTargetSprite(float pixelsPerUnit)
+        {
+            return CreatePatternSprite("VolleyTarget", pixelsPerUnit,
+                "XXX........XXX",
+                "X............X",
+                "X............X",
+                "..............",
+                "..............",
+                "..............",
+                "..............",
+                "..............",
+                "..............",
+                "..............",
+                "..............",
+                "X............X",
+                "X............X",
+                "XXX........XXX");
+        }
+
+        /// <summary>
+        /// The built-in mark of a checker picked as a volley's target: the target's corners with a cross on the disc.
+        /// The caller owns it and its texture, and destroys both when done.
+        /// </summary>
+        public static Sprite CreateAimedSprite(float pixelsPerUnit)
+        {
+            return CreatePatternSprite("VolleyAimed", pixelsPerUnit,
+                "XXX........XXX",
+                "X............X",
+                "X............X",
+                "..............",
+                "..............",
+                "......XX......",
+                ".....XXXX.....",
+                ".....XXXX.....",
+                "......XX......",
+                "..............",
+                "..............",
+                "X............X",
+                "X............X",
+                "XXX........XXX");
+        }
+
+        /// <summary>
+        /// A white sprite drawn from a pattern written top-down, 'X' for a pixel, one texel per canvas pixel. Keep width
+        /// and height even, so the centred pivot lands on a pixel edge and the sprite stays pixel-exact.
+        /// </summary>
+        private static Sprite CreatePatternSprite(string name, float pixelsPerUnit, params string[] rows)
+        {
             int width = rows[0].Length;
             int height = rows.Length;
 
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            texture.name = "Footprints";
+            texture.name = name;
             texture.filterMode = FilterMode.Point;
             texture.wrapMode = TextureWrapMode.Clamp;
 
-            // Texture rows run bottom-up; the pattern above is written top-down.
+            // Texture rows run bottom-up; the pattern is written top-down.
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
@@ -199,7 +249,7 @@ namespace Tavla.View
             texture.Apply();
 
             Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
-            sprite.name = "Footprints";
+            sprite.name = name;
             return sprite;
         }
     }

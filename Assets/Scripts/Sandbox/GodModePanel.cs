@@ -14,6 +14,7 @@ namespace Tavla.Sandbox
     /// (the toggle key hides it) where you:
     ///   • pick any special checkers for your side, both sides' checker counts, the tiles and the rules, and deal;
     ///   • load the dice — any pair, for this roll or for every roll — and switch the bot off to play both sides;
+    ///   • put any tile on any point of the match being played, or take one off, without dealing again;
     ///   • read a log of everything Core reported, and see the name of the checker under the pointer.
     ///
     /// It never bends a rule. Matches are built with Core's public setup API (<see cref="SandboxMatchFactory"/>) and
@@ -85,6 +86,10 @@ namespace Tavla.Sandbox
         private int _dieFirst = GameState.MaxDieValue;
         private int _dieSecond = GameState.MaxDieValue;
 
+        // The tile the panel puts on the match being played, and the point it goes on.
+        private TileKind _liveTile = TileKind.Maelstrom;
+        private int _livePoint = GameState.HomeBoardSize;
+
         // IMGUI draws the same controls in every pass of a frame, so a click that adds or removes controls (a log
         // line, a tile row) is carried out in Update instead, between frames.
         private Action _pendingAction;
@@ -100,6 +105,8 @@ namespace Tavla.Sandbox
         private CheckerKind[] _checkerKinds;
         private string[] _checkerNames;
         private TileKind[] _tileKinds;
+        private string[] _tileIds;
+        private readonly string[] _pointLabels = new string[GameState.NodeCount];
 
         private Camera _camera;
         private Rect _cameraRect;
@@ -158,6 +165,9 @@ namespace Tavla.Sandbox
                 _checkerNames[i] = GetShortName(_checkerKinds[i]);
 
             _tileKinds = (TileKind[])Enum.GetValues(typeof(TileKind));
+            _tileIds = new string[_tileKinds.Length];
+            for (int i = 0; i < _tileKinds.Length; i++)
+                _tileIds[i] = TileCatalog.GetEffectId(_tileKinds[i]);
 
             _hoverFilter = new ContactFilter2D();
             _hoverFilter.useTriggers = true; // Point colliders are triggers.
@@ -339,6 +349,28 @@ namespace Tavla.Sandbox
             return start;
         }
 
+        /// <summary>
+        /// Puts the picked tile on the picked point of the match being played, replacing the tile there. It acts on the
+        /// checkers that land there from now on; the next deal goes back to the setup's tiles.
+        /// </summary>
+        private void PlaceLiveTile()
+        {
+            _match.PlaceTile(_livePoint, TileCatalog.GetFactory(_liveTile)());
+            _log.Add($"{_liveTile} put on point {_livePoint}");
+            _board.RefreshBoard();
+        }
+
+        private void RemoveLiveTile()
+        {
+            ITileEffect tile = _match.Nodes[_livePoint].ActiveTile;
+            if (tile == null)
+                return;
+
+            _match.RemoveTile(_livePoint);
+            _log.Add($"{DescribeTile(tile)} taken off point {_livePoint}");
+            _board.RefreshBoard();
+        }
+
         #endregion
 
         #region Board camera
@@ -450,6 +482,8 @@ namespace Tavla.Sandbox
 
             if (checker.AbilitiesSuppressed)
                 text += "\nabilities off (fog)";
+            if (checker.IsReentering)
+                text += "\nabilities off (until it enters)";
 
             return text;
         }
@@ -460,7 +494,7 @@ namespace Tavla.Sandbox
             string text = $"Point {index}";
 
             if (node.ActiveTile != null)
-                text += $"  {node.ActiveTile.EffectId}";
+                text += $"  {DescribeTile(node.ActiveTile)}";
 
             ICountdownTile countdown = node.ActiveTile as ICountdownTile;
             if (countdown != null)
@@ -535,6 +569,7 @@ namespace Tavla.Sandbox
             if (_match != null)
             {
                 DrawMatch();
+                DrawLiveTiles();
                 DrawLog();
             }
 
@@ -607,6 +642,62 @@ namespace Tavla.Sandbox
             GUILayout.EndHorizontal();
 
             GUI.enabled = true;
+        }
+
+        /// <summary>
+        /// The tiles of the match being played: pick a tile and a point, and put it there or take the point's tile off.
+        /// The point grid is laid out as the board is, and marks (*) the points that hold a tile.
+        /// </summary>
+        private void DrawLiveTiles()
+        {
+            Section("Tiles in play");
+
+            GUI.enabled = !_match.IsMatchOver;
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("<", GUILayout.Width(SmallButtonWidth)))
+                _liveTile = StepTile(_liveTile, -1);
+            GUILayout.Label(_liveTile.ToString(), _valueStyle, GUILayout.Width(88f));
+            if (GUILayout.Button(">", GUILayout.Width(SmallButtonWidth)))
+                _liveTile = StepTile(_liveTile, 1);
+            if (GUILayout.Button($"Put on {_livePoint}"))
+                Defer(PlaceLiveTile);
+            if (GUILayout.Button("Take off"))
+                Defer(RemoveLiveTile);
+            GUILayout.EndHorizontal();
+
+            for (int cell = 0; cell < GameState.NodeCount; cell++)
+            {
+                int point = CellToPoint(cell);
+                _pointLabels[cell] = _match.Nodes[point].ActiveTile != null ? point + "*" : point.ToString();
+            }
+
+            // CellToPoint is its own inverse, so it also gives the cell of a point.
+            int picked = GUILayout.SelectionGrid(CellToPoint(_livePoint), _pointLabels, GameState.NodeCount / 2);
+            _livePoint = CellToPoint(picked);
+
+            GUILayout.Label($"Point {_livePoint}: {DescribeTile(_match.Nodes[_livePoint].ActiveTile)}", _noteStyle);
+
+            GUI.enabled = true;
+        }
+
+        /// <summary>
+        /// The point in this cell of a 12 x 2 grid laid out as the board is (<see cref="BoardLayout"/>): the top row
+        /// holds points 0-11 from the left, the bottom row 23-12. The mapping is its own inverse.
+        /// </summary>
+        private static int CellToPoint(int cell)
+        {
+            const int perRow = GameState.NodeCount / 2;
+            return cell < perRow ? cell : GameState.NodeCount - 1 + perRow - cell;
+        }
+
+        private string DescribeTile(ITileEffect tile)
+        {
+            if (tile == null)
+                return "no tile";
+
+            int index = Array.IndexOf(_tileIds, tile.EffectId);
+            return index >= 0 ? _tileKinds[index].ToString() : tile.EffectId;
         }
 
         private static string DescribeDice(DiceRoll roll)
@@ -794,9 +885,14 @@ namespace Tavla.Sandbox
 
         private void CycleTile(SandboxSetup.TileEntry tile, int step)
         {
-            int index = Array.IndexOf(_tileKinds, tile.Tile);
-            tile.Tile = _tileKinds[(index + step + _tileKinds.Length) % _tileKinds.Length];
+            tile.Tile = StepTile(tile.Tile, step);
             _setupChanged = true;
+        }
+
+        private TileKind StepTile(TileKind tile, int step)
+        {
+            int index = Array.IndexOf(_tileKinds, tile);
+            return _tileKinds[(index + step + _tileKinds.Length) % _tileKinds.Length];
         }
 
         private void DrawRules()

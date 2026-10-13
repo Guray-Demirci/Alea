@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: TileArt
   m_EditorClassIdentifier: Tavla.View::Tavla.View.TileArtSet
   _tiles:
+  - Tile: 2
+    Point: {fileID: 21300000, guid: 69c5e098a48af355ce1dc7cd5c0a0eb1, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: 82e9fdc7e1aa6efaedf9e71ff9c9334b, type: 3}
+    - {fileID: 21300000, guid: 6f81a8a43ac1d7c2292cffe22b86a64e, type: 3}
+    - {fileID: 21300000, guid: 4fcb46c5be4b957f0f06fc1c05436321, type: 3}
+    - {fileID: 21300000, guid: e3f831a0a6e1e4129602fb8e9bb8a466, type: 3}
+    - {fileID: 21300000, guid: 2ea94ed6c433666d0ad1323d197d647f, type: 3}
+    - {fileID: 21300000, guid: ff589abf4cb0fa21c15c9c5a0be5669f, type: 3}
+    FromDark: []
+    OpenFrame: 0
   - Tile: 6
     Point: {fileID: 21300000, guid: ac70e5da39f9112d9b501e86d0d88ea8, type: 3}
     FromLight:
@@ -29,4 +40,96 @@ MonoBehaviour:
     - {fileID: 21300000, guid: b0dabb3b9aa634930b2f7fecf2760d97, type: 3}
     - {fileID: 21300000, guid: 13eb91827d1b6f163a7f45b18ab8f17b, type: 3}
     - {fileID: 21300000, guid: 0643dca7b4d44d925dc4d1983a8b461b, type: 3}
+    OpenFrame: 0
+  - Tile: 0
+    Point: {fileID: 21300000, guid: e96896a48a2b4a6582111fa2dba8459c, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: 4277dfc1ccfb4a18beb2703f6b7a4fa8, type: 3}
+    - {fileID: 21300000, guid: 919ccd7b0e354f38be20583fa1ff0993, type: 3}
+    - {fileID: 21300000, guid: 3167394cad2c41fe9266eecf9f4f68c9, type: 3}
+    - {fileID: 21300000, guid: 008f06d4bb4a4fd9b34688e73b5882d0, type: 3}
+    - {fileID: 21300000, guid: 00a71cf01a734ae29582072014e1bb08, type: 3}
+    - {fileID: 21300000, guid: 86b0f7143cf54299ad1436485e5f3e54, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: 598131c2a3ad4e379a68392a45674b32, type: 3}
+    - {fileID: 21300000, guid: eece2c7a5dc347ae89908901545540a5, type: 3}
+    - {fileID: 21300000, guid: 5027d035b4b14a33b96d42bf8945de19, type: 3}
+    - {fileID: 21300000, guid: b0dc16eff5a14208bd0208c54f3d7ee5, type: 3}
+    - {fileID: 21300000, guid: 225fbcca35ee466bb7ff9b9ebf75b73a, type: 3}
+    - {fileID: 21300000, guid: 4e755a50fcf5445e99d184e67a193bba, type: 3}
+    OpenFrame: 0
+  - Tile: 5
+    Point: {fileID: 21300000, guid: 2e33b6095e9144ca94694a12fae7a18b, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: 836b39999bb045b6ba9c1d51cf4a025f, type: 3}
+    - {fileID: 21300000, guid: c3f9fd1cadae426b9ad94454f50c9dbb, type: 3}
+    - {fileID: 21300000, guid: 4f34b8e1bace43fb87bd0430a7c6d2f8, type: 3}
+    - {fileID: 21300000, guid: c949119ee0664ff8a2f6b4f233fbcd3a, type: 3}
+    - {fileID: 21300000, guid: 249fa9099cc0403dad803c3727d49ddf, type: 3}
+    - {fileID: 21300000, guid: 76fe6c2dbaad409cb0e9573984a30f24, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: c662977692bd4a4e8ac43bc59378f250, type: 3}
+    - {fileID: 21300000, guid: be18cd3889264c1291f52c8d52a1da93, type: 3}
+    - {fileID: 21300000, guid: 3886afdb120a4e169151deca6911fb83, type: 3}
+    - {fileID: 21300000, guid: a67cfb112f2f423e9f9a632a5c6bbae3, type: 3}
+    - {fileID: 21300000, guid: 3bc225c685904f208325c21b3335aa91, type: 3}
+    - {fileID: 21300000, guid: e657dc8d61bc4c79815d2943d03123f5, type: 3}
+    OpenFrame: 0
+  - Tile: 1
+    Point: {fileID: 21300000, guid: 610c17dc8ce34d4a9494148eb8b0f109, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: a6e5288a3bf4440ebdff139169797e7f, type: 3}
+    - {fileID: 21300000, guid: 1204501a39eb4940946e3e63cec80274, type: 3}
+    - {fileID: 21300000, guid: a08ad3a383f7414591be0bf50f7498af, type: 3}
+    - {fileID: 21300000, guid: 818b2110468c46adb2c20f19a727b9e0, type: 3}
+    - {fileID: 21300000, guid: 65ecb8c1f68a41a7bba196e83d1db59c, type: 3}
+    - {fileID: 21300000, guid: 464bdff40a5f4df9867f36fbbc610c38, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: e6966c6ab9a143cba740b1e43e5a07f9, type: 3}
+    - {fileID: 21300000, guid: 47117f9dbc5c4c2eb0544f565e53b5e6, type: 3}
+    - {fileID: 21300000, guid: 69b92b5e9dc44cfd94d4f535ab42275c, type: 3}
+    - {fileID: 21300000, guid: 3a134a18c8d449698bcfd8eacc68f8b3, type: 3}
+    - {fileID: 21300000, guid: 466678130a5b4495870de33bddb0b3cd, type: 3}
+    - {fileID: 21300000, guid: 9e70f84ceebd4c6d9d5561f1e7480ed9, type: 3}
+    OpenFrame: 0
+  - Tile: 4
+    Point: {fileID: 21300000, guid: f8fb1b680ef6436bb3d4b403e59333fc, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: 7104ec4fb96e4f8f86ed23e17695bac0, type: 3}
+    - {fileID: 21300000, guid: 9a04a0ebfc8243a2bf35922bfef456cf, type: 3}
+    - {fileID: 21300000, guid: b128e3321f1046afb3512c5d31418337, type: 3}
+    - {fileID: 21300000, guid: 563376f1d68a4138a2e12f46b2137830, type: 3}
+    - {fileID: 21300000, guid: c99e7091461645ff988e409bd97ed374, type: 3}
+    - {fileID: 21300000, guid: 98b98cbf163f4a19ae1bccfedd204ca3, type: 3}
+    - {fileID: 21300000, guid: c532d9029e8d491fb30a675f5cec9d4b, type: 3}
+    - {fileID: 21300000, guid: e73b0b69dcf0421aa1af7e5edae085c4, type: 3}
+    - {fileID: 21300000, guid: d61adfb1c2f14eba85bbdd9a5abed725, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: 03d4ccc0404b4ed1b8008d21f3057c1d, type: 3}
+    - {fileID: 21300000, guid: f1b29d61f3c94d039abe1540889c90ce, type: 3}
+    - {fileID: 21300000, guid: 5ecf920927d943f98b187235f727ab17, type: 3}
+    - {fileID: 21300000, guid: 6e86a790e7d54be48ee8958d7adaabb4, type: 3}
+    - {fileID: 21300000, guid: bb755ea3f2734c2ca47549001aaf33c7, type: 3}
+    - {fileID: 21300000, guid: 8e74ad4286b248c4885fd4ce235b4626, type: 3}
+    - {fileID: 21300000, guid: bfb7161c42984a99a9ab208abf295689, type: 3}
+    - {fileID: 21300000, guid: 97b1f198dcaf4ddda6a40d1ad65f1818, type: 3}
+    - {fileID: 21300000, guid: 5b7945ec5c1a4e42adb033c76f501129, type: 3}
+    OpenFrame: 5
+  - Tile: 7
+    Point: {fileID: 21300000, guid: 6b86417428f121f053e46b7e7ab46326, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: 6e61cb9219cc2dcade3d04a03077286f, type: 3}
+    - {fileID: 21300000, guid: 2e2bc79ca0936a50452edfcbfe6afcf6, type: 3}
+    - {fileID: 21300000, guid: 9fa2c98508396c92bf53d9f86d30018b, type: 3}
+    - {fileID: 21300000, guid: abeb5df0fd463aab6b114e81be113fc2, type: 3}
+    - {fileID: 21300000, guid: 4e43d83f393ed4c1855c5432be23e45d, type: 3}
+    - {fileID: 21300000, guid: 3219cee323b36986e04819c13b43d254, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: 19642d55b434a064e15ac721b65dd0e7, type: 3}
+    - {fileID: 21300000, guid: e9d315aa1c17e454cfea8effe517b830, type: 3}
+    - {fileID: 21300000, guid: c92b9fe3f4733c420c0428fb8179ecf1, type: 3}
+    - {fileID: 21300000, guid: 338197d292ba23236b8094e9a26c930e, type: 3}
+    - {fileID: 21300000, guid: cd27f6f41196eac7198513e7230a46cf, type: 3}
+    - {fileID: 21300000, guid: a70b68f5f8776bd68ec38d40d9a55bb4, type: 3}
+    OpenFrame: 0
   _frameSeconds: 0.1

@@ -18,7 +18,7 @@ namespace Tavla.Core.Tests
 
     /// <summary>
     /// Like <see cref="FixedRandom"/>, but every chance roll succeeds — for abilities and tiles that only
-    /// act on a lucky roll (Swamp, Double Down).
+    /// act on a lucky roll (Double Down, Clover).
     /// </summary>
     internal sealed class LuckyRandom : IRandomProvider
     {

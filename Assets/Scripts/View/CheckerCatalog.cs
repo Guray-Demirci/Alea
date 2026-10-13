@@ -44,6 +44,7 @@ namespace Tavla.View
                 case CheckerKind.Kraken: return ownerId => new KrakenChecker(ownerId);
                 case CheckerKind.Mutiny: return ownerId => new MutinyChecker(ownerId);
                 case CheckerKind.Hammer: return ownerId => new HammerChecker(ownerId);
+                case CheckerKind.Bowman: return ownerId => new BowmanChecker(ownerId);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown checker kind.");
             }

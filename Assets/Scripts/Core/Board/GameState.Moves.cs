@@ -158,10 +158,13 @@ namespace Tavla.Core.Board
         /// Does the current player have at least one playable move? Does NOT touch the board.
         /// The View uses it to decide "dice spent / no move left, pass the turn".
         /// Every checker counts, not only the topmost ones: a buried Nomad may reach a point the checker
-        /// above it cannot.
+        /// above it cannot. So does a Bowman's volley waiting for its targets: the turn must not pass before it is fired.
         /// </summary>
         public bool HasAnyLegalMove()
         {
+            if (HasPendingVolley)
+                return true;
+
             if (GetMovableChecker(BarIndex) != null)
                 return true;
 
@@ -259,6 +262,10 @@ namespace Tavla.Core.Board
             // ---------- 0) Time bomb: once the match is closed no move is accepted ----------
             if (IsMatchOver)
                 return MoveResult.Fail(MoveError.MatchOver, fromIndex, toIndex, playerId);
+
+            // A Bowman's volley must be fired before anything else is played (GameState.Volleys.cs).
+            if (IsAwaitingVolley)
+                return MoveResult.Fail(MoveError.VolleyPending, fromIndex, toIndex, playerId);
 
             // Bearing off is a separate path: the destination is not a point but the area off the board.
             // It goes through the same ResolveMove gate so both TryMove and CanMove support it.
@@ -410,6 +417,11 @@ namespace Tavla.Core.Board
             }
 
             NotifyMoveReactors(target, mover, result);
+
+            // A captured checker gets its abilities back once its entry is over — unless the entry itself has sent it
+            // back to the bar (a Spike Pit, a Gunpowder blast).
+            if (fromIndex == BarIndex && SideEffectsEnabled && FindNodeIndexOf(mover) != BarIndex)
+                mover.SetReentering(false);
 
             return result;
         }

@@ -13,7 +13,8 @@ namespace Tavla.Core.Abilities
     {
         /// <summary>
         /// Extra points this checker earns once a die has brought it to <paramref name="dieTargetIndex"/> (may be 0).
-        /// Asked before the move: the checker still stands on its source point (or on the bar).
+        /// Asked before the move: the checker still stands on its source point. Never on the bar: a captured checker
+        /// enters as a plain one.
         /// </summary>
         int GetBonusDistance(GameState state, int dieTargetIndex);
     }
