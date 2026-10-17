@@ -51,6 +51,36 @@ namespace Tavla.View
 
         public string AlreadyOwned = "ALREADY OWNED";
 
+        /// <summary>The pointer is on the stall.</summary>
+        public string SellButton = "SELL A CHECKER";
+
+        /// <summary>The sell list has just opened.</summary>
+        public string SellHint = "CLICK A CHECKER TO SELL";
+
+        /// <summary>The stall was clicked, but the deck holds no special checker.</summary>
+        public string NothingToSell = "NO CHECKERS TO SELL";
+
+        /// <summary>Beside each checker of the sell list. {0} = what it sells for.</summary>
+        public string SellPrice = "+{0}G";
+
+        /// <summary>Name, on the sell list, of the plain checkers beyond the ones the run started with.</summary>
+        public string ExtraChecker = "EXTRA CHECKER";
+
+        /// <summary>Over the plain checker of the sell list. {0} = how many can be sold.</summary>
+        public string SellCount = "x{0}";
+
+        /// <summary>The pointer is on a checker of the sell list. {0} = name, {1} = what it sells for.</summary>
+        public string SellOffer = "{0} +{1}G";
+
+        /// <summary>A checker of the sell list was clicked once; a second click sells it. {0} = name, {1} = what it sells for.</summary>
+        public string SellConfirm = "CLICK AGAIN TO SELL +{1}G";
+
+        /// <summary>
+        /// A checker was sold. {0} = name, {1} = the gold it brought. The name is left out by default: with it the
+        /// longest names would not fit the info line.
+        /// </summary>
+        public string SoldChecker = "SOLD FOR {1}G";
+
         /// <summary>Items missing here show the first two letters of their name.</summary>
         public ItemCode[] Codes =
         {

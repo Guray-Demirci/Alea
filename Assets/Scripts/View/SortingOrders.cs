@@ -5,7 +5,7 @@ namespace Tavla.View
     ///
     /// The layers are relative to each other
     /// (background &lt; board &lt; points &lt; tiles &lt; dice cards &lt; marks &lt; tray &lt; highlight &lt; checkers &lt;
-    /// volley marks &lt; tile counts &lt; bar &lt; HUD),
+    /// volley marks &lt; breaking checkers &lt; tile counts &lt; bar &lt; HUD),
     /// so scattering the numbers across files made it easy to break the stacking by editing one of them.
     /// Values that are also exposed in the Inspector use these constants as their defaults.
     /// </summary>
@@ -48,6 +48,13 @@ namespace Tavla.View
         public const int VolleyMark = 90;
 
         /// <summary>
+        /// A hit checker breaking apart where it stood (<see cref="HitEffects"/>): above the checkers on the points and
+        /// the volley marks, so it is seen over the capturer that has just landed on it; below a checker being dragged.
+        /// Where it puts itself back together it takes the place its checker has there.
+        /// </summary>
+        public const int CheckerBreak = 95;
+
+        /// <summary>
         /// A tile's countdown near its point's tip (Powder Keg): above the checkers stacked on the point, so a full
         /// stack never hides it; below a checker being dragged.
         /// </summary>
@@ -68,11 +75,20 @@ namespace Tavla.View
         /// <summary>The shop's Merchant Table: above the board, the bar and the HUD.</summary>
         public const int ShopTable = 300;
 
-        /// <summary>What stands on the table: the shelf cushions and the ROLL button.</summary>
+        /// <summary>What stands on the table: the shelf cushions, the ROLL button and the sell stall beside the board.</summary>
         public const int ShopShelf = 305;
 
-        /// <summary>The checkers for sale, lying on their cushions.</summary>
+        /// <summary>The glow of the sell stall while the pointer is on it (<see cref="HoverGlow"/>): over the stall.</summary>
+        public const int ShopShelfGlow = 306;
+
+        /// <summary>The dark backing of the list of checkers to sell: behind the checkers on it.</summary>
+        public const int ShopSellPanel = 307;
+
+        /// <summary>The checkers for sale, lying on their cushions, and the player's checkers on the sell list.</summary>
         public const int ShopItemArt = 310;
+
+        /// <summary>The ring around the checker the player is about to sell: over its art.</summary>
+        public const int ShopItemRing = 312;
 
         /// <summary>The dark strip under the table that carries the shop's info line.</summary>
         public const int ShopInfoStrip = 315;

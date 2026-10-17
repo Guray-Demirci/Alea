@@ -6,8 +6,8 @@ namespace Tavla.View
 {
     /// <summary>
     /// How the shop looks, as an asset (Create > Tavla > Shop Art). The sprites are cut from the artist's scheme
-    /// in_game_shop_ready.aseprite and the shelf files tierNyastık_wprice.aseprite; <see cref="ShopView"/> knows
-    /// where each one goes.
+    /// in_game_shop_ready.aseprite, the shelf files tierNyastık_wprice.aseprite and the stall Sell İkonu.aseprite;
+    /// <see cref="ShopView"/> knows where each one goes.
     /// </summary>
     [CreateAssetMenu(fileName = "ShopArt", menuName = "Tavla/Shop Art")]
     public sealed class ShopArtSet : ScriptableObject
@@ -27,15 +27,22 @@ namespace Tavla.View
                  "price tag. The pivot must sit on the centre of the cushion's disc, where the checker lies.")]
         [SerializeField] private Sprite[] _tierCushions = new Sprite[TierCount];
 
+        [Tooltip("The merchant's stall in the bottom right corner (Sell İkonu.aseprite), which opens the list of " +
+                 "checkers to sell, on a full 320x180 canvas. Its glow on hover is drawn from it, so its texture " +
+                 "must have Read/Write ticked.")]
+        [SerializeField] private Sprite _sellButton;
+
         public Sprite Table => _table;
         public Sprite RollButton => _rollButton;
+        public Sprite SellButton => _sellButton;
 
         /// <summary>Does every sprite the shop draws have art?</summary>
         public bool IsComplete
         {
             get
             {
-                if (_table == null || _rollButton == null || _tierCushions == null || _tierCushions.Length != TierCount)
+                if (_table == null || _rollButton == null || _sellButton == null ||
+                    _tierCushions == null || _tierCushions.Length != TierCount)
                     return false;
 
                 foreach (Sprite cushion in _tierCushions)

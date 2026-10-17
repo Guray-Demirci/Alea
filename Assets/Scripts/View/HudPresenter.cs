@@ -1,8 +1,5 @@
-using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 using Tavla.Core.Board;
-using Tavla.Core.Checkers;
 using Tavla.Core.Runtime;
 
 namespace Tavla.View
@@ -38,11 +35,9 @@ namespace Tavla.View
         [SerializeField] private int _playerId = 0;
 
         [Header("Formatting")]
-        [Tooltip("Separator placed between the remaining dice.")]
-        [SerializeField] private string _diceSeparator = " ";
-        [Tooltip("Text shown when there is no value (before the dice are rolled, after all moves are spent).")]
+        [Tooltip("Text shown when there is no value (a match without a target score).")]
         [SerializeField] private string _emptyValue = "-";
-        [Tooltip("Prefix of the remaining-turns text on the task line. The number is appended.")]
+        [Tooltip("Prefix of the remaining-turns text on the status line. The number is appended.")]
         [SerializeField] private string _turnsRemainingPrefix = "TURN ";
 
         [Header("Match result")]
@@ -52,9 +47,6 @@ namespace Tavla.View
 
         private GameState _board;
         private MatchContext _context;
-
-        // The dice list is rebuilt on every move; avoids string concatenation each time.
-        private readonly StringBuilder _builder = new StringBuilder(16);
 
         private void Awake()
         {
@@ -89,16 +81,11 @@ namespace Tavla.View
             _board = board;
             _context = context;
 
-            _board.TurnChanged += HandleTurnChanged;
             _board.TurnCountChanged += HandleTurnCountChanged;
-            _board.MoveExecuted += HandleMoveExecuted;
-            _board.CheckerReleased += HandleCheckerReleased;
-            _board.CheckerSacrificed += HandleCheckerSacrificed;
             _board.MatchEnded += HandleMatchEnded;
 
             _context.ScoreChanged += HandleScoreChanged;
             _context.GoldChanged += HandleGoldChanged;
-            _context.DiceRolled += HandleDiceRolled;
 
             RefreshAll();
         }
@@ -111,11 +98,7 @@ namespace Tavla.View
         {
             if (_board != null)
             {
-                _board.TurnChanged -= HandleTurnChanged;
                 _board.TurnCountChanged -= HandleTurnCountChanged;
-                _board.MoveExecuted -= HandleMoveExecuted;
-                _board.CheckerReleased -= HandleCheckerReleased;
-                _board.CheckerSacrificed -= HandleCheckerSacrificed;
                 _board.MatchEnded -= HandleMatchEnded;
                 _board = null;
             }
@@ -124,7 +107,6 @@ namespace Tavla.View
             {
                 _context.ScoreChanged -= HandleScoreChanged;
                 _context.GoldChanged -= HandleGoldChanged;
-                _context.DiceRolled -= HandleDiceRolled;
                 _context = null;
             }
         }
@@ -142,7 +124,7 @@ namespace Tavla.View
         /// Re-reads every slot from the model.
         ///
         /// Required in addition to the events: no event fires for the values present at bind time,
-        /// so the panel would stay empty until the first dice roll.
+        /// and the target score never changes during a match, so no event ever carries it.
         /// </summary>
         public void RefreshAll()
         {
@@ -151,18 +133,18 @@ namespace Tavla.View
 
             _view.SetField(HudField.Score, _context.GetScore(_playerId));
             _view.SetField(HudField.Gold, _context.GetGold(_playerId));
-            _view.SetField(HudField.Moves, FormatMoves());
-            _view.SetField(HudField.Task, FormatTurns(_board.RemainingTurns));
+            _view.SetField(HudField.Target, FormatTarget(_board.Rules));
+            _view.SetField(HudField.Status, FormatTurns(_board.RemainingTurns));
         }
 
         /// <summary>
-        /// Writes custom text on the task line — the hook for a future quest/contract system.
+        /// Writes custom text on the status line (a volley's picks left, the shop).
         /// Overrides the remaining-turns text.
         /// </summary>
-        public void SetTask(string text)
+        public void SetStatus(string text)
         {
             if (_view != null)
-                _view.SetField(HudField.Task, text);
+                _view.SetField(HudField.Status, text);
         }
 
         /// <summary>
@@ -173,12 +155,6 @@ namespace Tavla.View
         {
             if (_view != null)
                 _view.SetField(HudField.Gold, gold);
-        }
-
-        private void RefreshMoves()
-        {
-            if (_view != null)
-                _view.SetField(HudField.Moves, FormatMoves());
         }
 
         #endregion
@@ -197,40 +173,10 @@ namespace Tavla.View
                 _view.SetField(HudField.Gold, gold);
         }
 
-        private void HandleDiceRolled(DiceRoll roll)
-        {
-            RefreshMoves();
-        }
-
-        /// <summary>A move spends a die; the remaining moves change.</summary>
-        private void HandleMoveExecuted(MoveResult result)
-        {
-            RefreshMoves();
-        }
-
-        /// <summary>Freeing a locked checker (Swamp) sacrifices a die without moving anything.</summary>
-        private void HandleCheckerReleased(BaseChecker checker, int nodeIndex)
-        {
-            RefreshMoves();
-        }
-
-        /// <summary>Sacrificing a checker for its ability (Second Chance) can add a die.</summary>
-        private void HandleCheckerSacrificed(BaseChecker checker, int nodeIndex)
-        {
-            RefreshMoves();
-        }
-
-        private void HandleTurnChanged(int playerId)
-        {
-            // The dice are NOT rolled YET (BoardManager rolls after taking the turn) — so the "-" shown
-            // here is correct: the new turn's moves are not known yet.
-            RefreshMoves();
-        }
-
         private void HandleTurnCountChanged(int remaining)
         {
             if (_view != null)
-                _view.SetField(HudField.Task, FormatTurns(remaining));
+                _view.SetField(HudField.Status, FormatTurns(remaining));
         }
 
         private void HandleMatchEnded(int winnerId)
@@ -246,43 +192,17 @@ namespace Tavla.View
             else
                 message = _loseText;
 
-            _view.SetField(HudField.Task, message);
-            _view.SetField(HudField.Moves, _emptyValue);
+            _view.SetField(HudField.Status, message);
         }
 
         #endregion
 
         #region Formatting
 
-        /// <summary>
-        /// Remaining moves. Both dice consumption modes are shown in the same slot:
-        ///   Normal     : the remaining die values ("5 3", "6 6 6 6" on a double),
-        ///   FreeSplit  : a single splittable pool ("8") — while Cartographer's Cheat is active.
-        /// </summary>
-        private string FormatMoves()
+        /// <summary>The score to reach. A classic match (no target, like most sandbox setups) shows the empty value.</summary>
+        private string FormatTarget(MatchRules rules)
         {
-            if (_context == null)
-                return _emptyValue;
-
-            DiceRoll roll = _context.CurrentRoll;
-            if (roll == null || !roll.HasMovesLeft)
-                return _emptyValue;
-
-            if (roll.FreeSplit)
-                return roll.FreeTotal.ToString();
-
-            IReadOnlyList<int> moves = roll.RemainingMoves;
-
-            _builder.Clear();
-            for (int i = 0; i < moves.Count; i++)
-            {
-                if (i > 0)
-                    _builder.Append(_diceSeparator);
-
-                _builder.Append(moves[i]);
-            }
-
-            return _builder.ToString();
+            return rules.HasTargetScore ? rules.TargetScore.Value.ToString() : _emptyValue;
         }
 
         private string FormatTurns(int remaining)

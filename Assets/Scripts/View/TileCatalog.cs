@@ -25,6 +25,7 @@ namespace Tavla.View
                 case TileKind.SpikePit: return () => new SpikePitTile();
                 case TileKind.PowderKeg: return () => new PowderKegTile();
                 case TileKind.PlunderCove: return () => new PlunderCoveTile();
+                case TileKind.Graveyard: return () => new GraveyardTile();
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown tile kind.");
             }

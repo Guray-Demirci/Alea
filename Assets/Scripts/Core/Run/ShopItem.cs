@@ -92,8 +92,11 @@ namespace Tavla.Core.Run
 
         #endregion
 
-        /// <summary>Hands the bought item to the run: checkers to the deck, cards and charms to the relics.</summary>
-        internal void Deliver(RunState run)
+        /// <summary>
+        /// Hands the bought item to the run: checkers to the deck, which remembers the price paid so the checker
+        /// can be sold back; cards and charms to the relics.
+        /// </summary>
+        internal void Deliver(RunState run, int price)
         {
             if (_createRelic != null)
             {
@@ -101,7 +104,7 @@ namespace Tavla.Core.Run
                 return;
             }
 
-            run.AddToDeck(_createChecker);
+            run.AddToDeck(_createChecker, price);
         }
 
         private static IPurchasable DescribeChecker(BaseChecker sample, string paramName)

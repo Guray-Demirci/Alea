@@ -106,6 +106,9 @@ namespace Tavla.View
                 case CaptureDestination.Converted:
                     GameLog.Info($"[View] {checker.TypeId} mutinied and changed sides (point {nodeIndex}).");
                     break;
+                case CaptureDestination.Graveyard:
+                    GameLog.Info($"[View] {checker.TypeId} was hit (point {nodeIndex}) and rose from the graveyard.");
+                    break;
                 default:
                     GameLog.Info($"[View] {checker.TypeId} was hit and sent to the bar (point {nodeIndex}).");
                     break;

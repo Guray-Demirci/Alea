@@ -23,7 +23,10 @@ namespace Tavla.Core.Board
         /// <summary>Score the scoring player must reach; null in Classic mode.</summary>
         public int? TargetScore { get; }
 
-        /// <summary>The player who chases the target and whose turns are counted. Only meaningful with a target.</summary>
+        /// <summary>
+        /// The player — the side the design calls "you", against the opponent. With a target, the one who chases it and
+        /// whose turns are counted. In both modes, the side whose captured checkers the Graveyard never takes.
+        /// </summary>
         public int ScoringPlayerId { get; }
 
         /// <summary>
@@ -44,9 +47,12 @@ namespace Tavla.Core.Board
 
         /// <summary>Higher score wins; every turn of both players counts.</summary>
         /// <param name="turnLimit">Values below 1 are raised to 1, as GameState has always done.</param>
-        public static MatchRules Classic(int turnLimit = GameState.DefaultTurnLimit)
+        /// <param name="playerId">The player (<see cref="ScoringPlayerId"/>); only the Graveyard asks.</param>
+        public static MatchRules Classic(int turnLimit = GameState.DefaultTurnLimit, int playerId = 0)
         {
-            return new MatchRules(Math.Max(1, turnLimit), null, 0, 0);
+            GameState.ThrowIfInvalidPlayer(playerId, nameof(playerId));
+
+            return new MatchRules(Math.Max(1, turnLimit), null, playerId, 0);
         }
 
         /// <summary>The scoring player must reach <paramref name="targetScore"/> within their own turns.</summary>

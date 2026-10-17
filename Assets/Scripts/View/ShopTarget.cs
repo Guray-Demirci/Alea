@@ -3,9 +3,9 @@ using Tavla.Core.Run;
 namespace Tavla.View
 {
     /// <summary>
-    /// Everything on the shop screen that reacts to the pointer: the six shelves, then the two buttons.
-    /// The shelves come first and in the same order as <see cref="ShopSlot"/>, so a shelf converts with a cast.
-    /// The card and charm shelves have no place on the Merchant Table yet (see <see cref="ShopView"/>).
+    /// Everything on the shop screen that reacts to the pointer, apart from the sell list's slots: the six shelves,
+    /// then the buttons. The shelves come first and in the same order as <see cref="ShopSlot"/>, so a shelf
+    /// converts with a cast. The card and charm shelves have no place on the Merchant Table yet (see <see cref="ShopView"/>).
     /// </summary>
     public enum ShopTarget
     {
@@ -20,6 +20,9 @@ namespace Tavla.View
         Next,
 
         /// <summary>"ROLL": reroll the shelves.</summary>
-        Reroll
+        Reroll,
+
+        /// <summary>The merchant's stall beside the board: opens and closes the list of checkers to sell.</summary>
+        Sell
     }
 }

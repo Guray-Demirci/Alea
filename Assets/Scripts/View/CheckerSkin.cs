@@ -30,6 +30,10 @@ namespace Tavla.View
         [Tooltip("Drawn around the checker while it is picked up — for art without a Selected sprite of its own. Empty = none.")]
         public Sprite SelectedRing;
 
+        [Tooltip("The checker breaking apart when it is hit, frame by frame, without the frame that shows it whole. " +
+                 "Played backwards where it comes back (the bar). Empty = a hit on it only shakes the screen.")]
+        public Sprite[] Break = new Sprite[0];
+
         /// <summary>True if the skin brings its own art, drawn in its own colours.</summary>
         public bool HasArt => Normal != null;
     }

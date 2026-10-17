@@ -7,8 +7,9 @@ namespace Tavla.View
 {
     /// <summary>
     /// How the player's special checkers look on the board, as an asset (Create > Tavla > Checker Art).
-    /// Each kind brings only its resting art; whether it can move or is picked up is shown by a shared ring drawn
-    /// around it, so a new checker needs a single sprite. A kind missing here looks like a plain checker.
+    /// Each kind brings its resting art and the frames of it breaking when hit; whether it can move or is picked up is
+    /// shown by a shared ring drawn around it, so a new checker needs no other sprite. A kind missing here looks like
+    /// a plain checker.
     ///
     /// The art is keyed by the dropdown kind for the Inspector, and looked up by <see cref="BaseChecker.TypeId"/>
     /// on the board; <see cref="CheckerCatalog"/> connects the two.
@@ -23,6 +24,10 @@ namespace Tavla.View
 
             [Tooltip("The checker at rest, drawn in its own colours. Its pivot must sit on the centre of the disc.")]
             public Sprite Sprite;
+
+            [Tooltip("The checker breaking apart when it is hit, without the frame that shows it whole; pivots on the " +
+                     "centre of the disc, like the resting art. Empty = a hit on it only shakes the screen.")]
+            public Sprite[] Break = new Sprite[0];
         }
 
         [Tooltip("Drawn around a special checker while the pointer is over it and it can move with the rolled dice.")]
@@ -36,6 +41,9 @@ namespace Tavla.View
 
         // TypeId -> skin, built on first use; dropped whenever the asset is edited.
         private Dictionary<string, CheckerSkin> _skins;
+
+        /// <summary>The ring drawn around a picked-up checker, shared by every kind; the shop rings plain checkers with it too.</summary>
+        public Sprite SelectedRing => _selectedRing;
 
         /// <summary>The skin for checkers of this type, or null if the type has no art here.</summary>
         public CheckerSkin GetSkin(string typeId)
@@ -68,7 +76,8 @@ namespace Tavla.View
                 {
                     Normal = entry.Sprite,
                     MovableRing = _movableRing,
-                    SelectedRing = _selectedRing
+                    SelectedRing = _selectedRing,
+                    Break = entry.Break ?? new Sprite[0]
                 });
             }
 

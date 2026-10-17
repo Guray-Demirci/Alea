@@ -51,6 +51,15 @@ Key rules of the design:
   the Merchant Table from `Assets/Data/ShopArt.asset` (sprites in `Assets/Sprites/Shop`, cut from
   `in_game_shop_ready.aseprite`) and `ShopPresenter` connects it to Core. The table has no place for the
   card and charm shelves yet, so Core stocks them but the screen does not show them.
+- **The shop buys checkers back.** `Shop.Sell` takes a checker out of the deck for half of what was paid for
+  it (`ShopPrices.GetSellPrice`: rounded down, at least 1 gold): any special checker, which frees a place under
+  the five-special limit, and the extra plain checkers — those beyond the ones the run started with, the
+  dearest first. The stall in the bottom right corner (`Sell İkonu.aseprite`, shown only in the shop) opens the
+  list in the frame's sunken panel above it: a row per special checker, then one row for the extra plain
+  checkers with their number on it; a row is sold with two clicks, the first one rings it. While the pointer is
+  on the stall it glows (`HoverGlow`): a warm outline around its outer edge, a fainter halo and a pale wash over
+  it, breathing gently. The glow is drawn in code from the stall's own sprite, so it follows a re-export of the art,
+  but that sprite must keep Read/Write ticked in its import settings.
 - **The board is layered art.** `BoardManager` stacks full-canvas (320x180) sprites: `background.png`,
   `board.png` and `points.png`, the 24 triangles. While a checker is dragged, every legal point shows
   `point_highlight.png` around itself, mirrored on the bottom row. Both point sprites are exported from
@@ -61,7 +70,7 @@ Key rules of the design:
   and a spent die's card turns back down. `DiceCardsView` plays the artist's flip (`1kartanimasyon` to
   `6kartanimasyon`, faster than drawn: the asset's frame time) forwards to turn a card up and backwards to turn it
   down, and `DiceCardsPresenter` connects the cards to Core. Only rolls played by hand turn cards up; the bot's
-  leave them face down. The info panel still lists the dice as text.
+  leave them face down. The cards are the only place the dice are shown; the info panel no longer lists them.
 - **Tiles are drawn as their point.** `TilesView` lays a tile's art over its whole triangle
   (`Assets/Data/TileArt.asset`; sprites in `Assets/Sprites/Tiles`, cropped to the 10x56 triangle). The art is drawn
   for the bottom row and turned half round on the top row, as `points.png` does. A point that gains a tile plays the
@@ -89,11 +98,22 @@ Key rules of the design:
   that many of the opponent's checkers on the board (`TryFireVolley`; made points too, not Armored ones) and accepts
   nothing else meanwhile; a volley not fired by the end of the turn is lost. While a human's volley waits,
   `BoardManager` marks every checker it can hit, a click picks one (a second click drops it), the volley fires on the
-  last pick and the info panel's task line counts the picks left. The marks are built-in placeholders until there is
+  last pick and the info panel's status line counts the picks left. The marks are built-in placeholders until there is
   art (*Volley* fields). The bot fires its own at the checkers closest to bearing off.
+- **Hits are felt.** `HitEffects` (built and ticked by `BoardManager`) shakes the screen when a checker is hit (as the
+  capturing checker lands, not when Core reports the capture) and harder when a Powder Keg blows up; `CameraShake`
+  moves the camera in whole canvas pixels and fades out. A hit checker whose skin has *Break* frames stays where it
+  was hit until then, breaks apart there and puts itself back together on the bar (the frames backwards) before its own
+  visual shows again. Every checker has them: the plain ones in BoardManager's skins (`RakipTasKırılmaAnimasyon`,
+  `OyuncuTasKırılmaAnimasyon` in `Assets/Sprites`), each special one in its `CheckerArt.asset` entry
+  (`Assets/Sprites/Checkers/Breaks`, the artist's file names kept). Each is frames 2-6 of the artist's file (frame 1 is
+  the checker whole, frame 7 empty), cut square around the disc so the pivot sits on its centre, as on the resting
+  art. The strength and length of each shake are BoardManager's *Hit effects* fields.
 - **The info panel is built in code too.** `HudView` draws `general_info.png` (exported from
   `general_info_scheme.aseprite`) and writes the values `HudPresenter` gives it into text boxes measured
   pixel by pixel from the art, as the shop does. If a strip moves in the art, update its box in the Inspector.
+  Top to bottom the strips show the status line (`TURN 5`, a volley's picks left, `SHOP`, the match result), the
+  score, the task (`TASK`: the score the match asks for, `-` in a match without a target) and the gold.
 - **Text is Alagard, drawn as sprites.** `PixelFont` holds the glyphs of `Assets/Fonts/alagard.ttf` (by Pix3M)
   as a table generated from the TTF's pixel grid; `PixelLabel` lays them out and draws them at half size
   (`PixelTextSize.Regular`), or at a third (`Small`) where the art leaves less room, such as the shop's price tags.
@@ -113,6 +133,9 @@ run are untouched by it. Open the scene and press Play; the **GOD MODE** panel d
   again. The point grid is laid out like the board (top row 0-11 from the left, bottom row 23-12; `*` = holds a
   tile). A tile put on checkers catches only the ones that land there afterwards; the next deal goes back to the
   setup's tiles.
+- **Hit effects**: switch the screen shake and the checkers' breaks on or off, and set how far and how long a hit and a
+  keg's blast shake the screen (*Try* feels one at once). The edits last until Play mode ends; keep the good values in
+  BoardManager's *Hit effects* fields, in both scenes.
 - **Log**: every roll, move, ability (`*`), tile (`#`), capture, score and gold change Core reports. Hovering a checker
   shows its name, side and point.
 

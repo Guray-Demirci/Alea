@@ -21,6 +21,11 @@ namespace Tavla.Core.Run
     /// A reroll ("RAN") restocks every shelf except the plain checker. Each visit allows as many rerolls as the
     /// price list has reroll prices (1, 3, 5, 7, 9 gold), starting again from the first price next visit.
     ///
+    /// The shop also buys back checkers of the deck (GDD: "elinde bulunan taşları satarak yerine başkalarını
+    /// alabilecek") for half of what was paid for them: every special checker, which frees a place under the
+    /// special checker limit, and the EXTRA plain checkers — those beyond the <see cref="RunDefinition.StartingCheckers"/>
+    /// the run started with. The plain checkers are alike, so the dearest one goes first.
+    ///
     /// Checker effects on the shop (GDD):
     ///   - Phoenix Checker ("Küllerinden Doğuş"): the next visit is a LUXURY shop — the special checker shelves
     ///     skip tier 1, at their normal prices, and the other tiers share its chance;
@@ -64,7 +69,7 @@ namespace Tavla.Core.Run
         /// <summary>What the next reroll costs; null when none is left.</summary>
         public int? NextRerollPrice => RerollsLeft > 0 ? _catalog.Prices.Rerolls[RerollsUsed] : (int?)null;
 
-        /// <summary>Something changed: an item was bought, the shelves were rerolled or the shop closed.</summary>
+        /// <summary>Something changed: an item was bought, a checker sold, the shelves were rerolled or the shop closed.</summary>
         public event Action Changed;
 
         internal Shop(RunState run, ShopCatalog catalog, IRandomProvider random, bool isLuxury, ShopTierOdds tierOdds)
@@ -124,7 +129,7 @@ namespace Tavla.Core.Run
             ShopOffer offer = GetOffer(slot);
 
             // Delivered first: if the item's factory failed, no gold would be lost.
-            offer.Item.Deliver(_run);
+            offer.Item.Deliver(_run, offer.Price);
             _run.SpendGold(offer.Price);
 
             // The plain checker shelf restocks itself.
@@ -133,6 +138,118 @@ namespace Tavla.Core.Run
 
             Changed?.Invoke();
             return PurchaseResult.Success;
+        }
+
+        #endregion
+
+        #region Selling
+
+        /// <summary>
+        /// Fills <paramref name="result"/> with the checkers the player could sell: the deck's special checkers in
+        /// deck order, then its extra plain checkers, the dearest first (the order they would be sold in).
+        /// </summary>
+        public void GetSellableCheckers(List<DeckEntry> result)
+        {
+            if (result == null)
+                throw new ArgumentNullException(nameof(result));
+
+            result.Clear();
+            foreach (DeckEntry entry in _run.Deck)
+            {
+                if (entry.IsSpecial)
+                    result.Add(entry);
+            }
+
+            // The plain checkers, dearest first; equally priced ones keep their deck order. Only the extra ones stay.
+            int firstPlain = result.Count;
+            foreach (DeckEntry entry in _run.Deck)
+            {
+                if (entry.IsSpecial)
+                    continue;
+
+                int at = result.Count;
+                while (at > firstPlain && result[at - 1].PurchasePrice < entry.PurchasePrice)
+                    at--;
+
+                result.Insert(at, entry);
+            }
+
+            int keep = firstPlain + ExtraPlainCheckerCount;
+            result.RemoveRange(keep, result.Count - keep);
+        }
+
+        /// <summary>
+        /// Plain checkers the deck holds beyond the ones the run started with: those may be sold. Fewer plain checkers
+        /// than that (some lost for good) leave none to spare.
+        /// </summary>
+        public int ExtraPlainCheckerCount
+        {
+            get
+            {
+                int plain = 0;
+                foreach (DeckEntry entry in _run.Deck)
+                {
+                    if (!entry.IsSpecial)
+                        plain++;
+                }
+
+                return Math.Max(0, plain - _run.Definition.StartingCheckers);
+            }
+        }
+
+        /// <summary>What selling this checker pays: half of what was paid for it (<see cref="ShopPrices.GetSellPrice"/>).</summary>
+        public int GetSellPrice(DeckEntry entry)
+        {
+            if (entry == null)
+                throw new ArgumentNullException(nameof(entry));
+
+            return ShopPrices.GetSellPrice(entry.PurchasePrice);
+        }
+
+        /// <summary>Could this checker be sold right now? Has no side effects.</summary>
+        public SaleResult CheckSale(DeckEntry entry)
+        {
+            if (!IsOpen)
+                return SaleResult.ShopClosed;
+
+            if (entry == null || !InDeck(entry))
+                return SaleResult.NotInDeck;
+
+            if (!entry.IsSpecial && ExtraPlainCheckerCount == 0)
+                return SaleResult.NotForSale;
+
+            return SaleResult.Success;
+        }
+
+        /// <summary>
+        /// Sells a checker of the deck back: it leaves the deck at once — a special one frees its place among the
+        /// special checkers — and its sell price is added to the gold. The shelves on show stay as they are; a later
+        /// reroll may offer a sold special checker again. Any plain checker may be named while there is one to
+        /// spare: they are alike, though what each one brings depends on what was paid for it.
+        /// </summary>
+        public SaleResult Sell(DeckEntry entry)
+        {
+            SaleResult result = CheckSale(entry);
+            if (result != SaleResult.Success)
+                return result;
+
+            int price = GetSellPrice(entry);
+            _run.RemoveFromDeck(entry);
+            _run.EarnGold(price);
+
+            Changed?.Invoke();
+            return SaleResult.Success;
+        }
+
+        private bool InDeck(DeckEntry entry)
+        {
+            foreach (DeckEntry held in _run.Deck)
+            {
+                if (ReferenceEquals(held, entry))
+                    return true;
+            }
+
+            return false;
         }
 
         #endregion

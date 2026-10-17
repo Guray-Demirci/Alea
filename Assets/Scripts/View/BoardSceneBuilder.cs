@@ -5,8 +5,8 @@ using Tavla.Core.Board;
 namespace Tavla.View
 {
     /// <summary>
-    /// Builds the parts of the board scene that never change during a game: the camera, the full-canvas art layers,
-    /// the 24 points with their highlights and marks, the bear-off tray and the sprites generated at runtime.
+    /// Builds the parts of the board scene that never change during a game: the camera and its shake, the full-canvas
+    /// art layers, the 24 points with their highlights and marks, the bear-off tray and the sprites generated at runtime.
     /// No game rules and no match state — <see cref="BoardManager"/> calls it once at startup and keeps what it returns.
     ///
     /// Every generated visual lives at the SCENE ROOT, at the world origin, not under BoardManager's object:
@@ -40,6 +40,28 @@ namespace Tavla.View
             cam.backgroundColor = background;
             cam.transform.position = new Vector3(0f, 0f, -10f);
             cam.transform.rotation = Quaternion.identity;
+        }
+
+        /// <summary>
+        /// The camera's shake for hits and blasts (<see cref="HitEffects"/>), moving in whole pixels of the board art.
+        /// Put on the main camera whether or not BoardManager configures it; null if the scene has no camera.
+        /// </summary>
+        public static CameraShake AddCameraShake(BoardLayout layout)
+        {
+            Camera cam = Camera.main;
+
+            if (cam == null)
+                cam = Object.FindAnyObjectByType<Camera>();
+
+            if (cam == null)
+                return null;
+
+            CameraShake shake = cam.GetComponent<CameraShake>();
+            if (shake == null)
+                shake = cam.gameObject.AddComponent<CameraShake>();
+
+            shake.PixelsPerUnit = layout.PixelsPerUnit;
+            return shake;
         }
 
         /// <summary>An empty object at the scene root and the world origin, to parent generated visuals under.</summary>

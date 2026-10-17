@@ -15,6 +15,7 @@ namespace Tavla.Sandbox
     ///   • pick any special checkers for your side, both sides' checker counts, the tiles and the rules, and deal;
     ///   • load the dice — any pair, for this roll or for every roll — and switch the bot off to play both sides;
     ///   • put any tile on any point of the match being played, or take one off, without dealing again;
+    ///   • tune the game's hit effects: the screen shake on hits and Powder Keg blasts, and hit checkers breaking apart;
     ///   • read a log of everything Core reported, and see the name of the checker under the pointer.
     ///
     /// It never bends a rule. Matches are built with Core's public setup API (<see cref="SandboxMatchFactory"/>) and
@@ -38,6 +39,7 @@ namespace Tavla.Sandbox
         private const int ScoreStep = 10;
 
         private static readonly string[] DieFaces = { "1", "2", "3", "4", "5", "6" };
+        private static readonly string[] ShakePixels = { "1 px", "2 px", "3 px", "4 px" };
 
         [Header("Connection")]
         [Tooltip("The scene's BoardManager, with its Run field EMPTY. Empty here = looked up in the scene.")]
@@ -570,6 +572,7 @@ namespace Tavla.Sandbox
             {
                 DrawMatch();
                 DrawLiveTiles();
+                DrawImpacts();
                 DrawLog();
             }
 
@@ -679,6 +682,44 @@ namespace Tavla.Sandbox
             GUILayout.Label($"Point {_livePoint}: {DescribeTile(_match.Nodes[_livePoint].ActiveTile)}", _noteStyle);
 
             GUI.enabled = true;
+        }
+
+        /// <summary>
+        /// The game's hit effects (<see cref="BoardManager.HitEffects"/>): screen shake on or off, and for a hit and a
+        /// keg's blast how far and how long it shakes, with a button to feel each; checker breaks on or off. Edits last
+        /// until Play mode ends; the values worth keeping go into BoardManager's Hit effects fields in both scenes.
+        /// </summary>
+        private void DrawImpacts()
+        {
+            HitEffects effects = _board.HitEffects;
+            if (effects == null)
+                return;
+
+            Section("Hit effects");
+
+            effects.ShakeEnabled = GUILayout.Toggle(effects.ShakeEnabled, " Shake on hits and keg blasts");
+            DrawShakeRows("Hit", effects.HitShake, effects);
+            DrawShakeRows("Keg blast", effects.BlastShake, effects);
+
+            effects.BreaksEnabled = GUILayout.Toggle(effects.BreaksEnabled, " A hit opponent checker breaks apart");
+        }
+
+        private void DrawShakeRows(string label, ShakeStyle style, HitEffects effects)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label, GUILayout.Width(LabelWidth * 0.75f));
+            int pixels = Mathf.Clamp(style.Pixels, 1, ShakeStyle.MaxPixels);
+            style.Pixels = GUILayout.SelectionGrid(pixels - 1, ShakePixels, ShakePixels.Length) + 1;
+            if (GUILayout.Button("Try", GUILayout.Width(40f)))
+                effects.TryShake(style);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(LabelWidth * 0.75f + 4f);
+            float duration = GUILayout.HorizontalSlider(style.Duration, 0.05f, 0.6f);
+            style.Duration = Mathf.Round(duration * 100f) / 100f;
+            GUILayout.Label($"{style.Duration:0.00} s", GUILayout.Width(48f));
+            GUILayout.EndHorizontal();
         }
 
         /// <summary>

@@ -33,7 +33,9 @@ namespace Tavla.View
     /// RefreshBoard() re-reads the board from the model's current state. That is why the Doomsday
     /// Checker's mass capture, the Maelstrom's teleport, the Phoenix's return and 30 other special
     /// cases need not a single extra line of View code. The one exception is a checker the Maelstrom breaks on a made
-    /// point: it is held there for a moment (<see cref="Crash"/>), so the player sees it land before it is broken.
+    /// point: it is held there for a moment (<see cref="Crash"/>), so the player sees it land before it is broken. Hits
+    /// are shown apart too, by <see cref="HitEffects"/>: the screen shakes as the capturer lands, and a checker with break
+    /// art stays where it was hit until then, breaks apart there and puts itself back together on the bar.
     /// </summary>
     public class BoardManager : MonoBehaviour
     {
@@ -90,7 +92,7 @@ namespace Tavla.View
         [SerializeField] private Sprite _volleyAimedSprite;
         [Tooltip("Tint of the picked mark. White keeps an assigned sprite's own colours.")]
         [SerializeField] private Color _volleyAimedColor = new Color(1f, 0.2f, 0.15f, 1f);
-        [Tooltip("The info panel's task line while the human picks a volley's targets. {0} = targets left to pick. " +
+        [Tooltip("The info panel's status line while the human picks a volley's targets. {0} = targets left to pick. " +
                  "Keep it as short as the turn counter it replaces.")]
         [SerializeField] private string _volleyTask = "SHOOT {0}";
 
@@ -123,6 +125,19 @@ namespace Tavla.View
         [Tooltip("A checker the Maelstrom throws onto a point it may not enter (a made point) first goes there, and is " +
                  "broken this long after it arrives (seconds).")]
         [SerializeField, Min(0f)] private float _crashDelay = 0.5f;
+
+        [Header("Hit effects")]
+        [Tooltip("Shake the screen when a checker is hit and when a Powder Keg blows up.")]
+        [SerializeField] private bool _screenShake = true;
+        [Tooltip("A hit: as the capturing checker lands on the point, or at once for a volley or a tile.")]
+        [SerializeField] private ShakeStyle _hitShake = new ShakeStyle { Pixels = 1, Duration = 0.15f };
+        [Tooltip("A Powder Keg's blast.")]
+        [SerializeField] private ShakeStyle _blastShake = new ShakeStyle { Pixels = 2, Duration = 0.3f };
+        [Tooltip("A hit checker whose skin has Break frames breaks apart where it stood, then puts itself back " +
+                 "together where it goes (the bar).")]
+        [SerializeField] private bool _checkerBreaks = true;
+        [Tooltip("Seconds each frame of a break shows (100 ms in the artist's file).")]
+        [SerializeField, Min(0.01f)] private float _breakFrameTime = 0.1f;
 
         [Header("Info panel")]
         [Tooltip("Presenter that writes score/gold/moves on the left panel. If empty it is searched for in " +
@@ -202,6 +217,9 @@ namespace Tavla.View
         // Writes the match's events to the console; the listeners below only act on what changes the screen.
         private readonly BoardEventLog _eventLog = new BoardEventLog();
 
+        // The screen shake and the breaks of hit checkers; built with the scene.
+        private HitEffects _hitEffects;
+
         // Core object -> scene representative. This dictionary is the View's only link to the model.
         private readonly Dictionary<BaseChecker, CheckerController> _checkerViews =
             new Dictionary<BaseChecker, CheckerController>();
@@ -256,6 +274,12 @@ namespace Tavla.View
 
         /// <summary>The run being played; null in a sandbox match.</summary>
         public RunState Run => _runState;
+
+        /// <summary>
+        /// The screen shake and the breaks of hit checkers, set up from the Hit effects fields; the sandbox's god-mode
+        /// panel tunes them during a match. Null until the scene is built.
+        /// </summary>
+        public HitEffects HitEffects => _hitEffects;
 
         /// <summary>
         /// Is the bot playing its seat? Turned off, a human plays both sides; turned back on, the bot picks up its
@@ -427,7 +451,7 @@ namespace Tavla.View
         private MatchRules CreateSandboxRules()
         {
             if (_targetScore <= 0)
-                return MatchRules.Classic(_turnLimit);
+                return MatchRules.Classic(_turnLimit, HumanPlayerId);
 
             return MatchRules.ForTarget(_targetScore, _turnLimit, _finalStretchTurns, HumanPlayerId);
         }
@@ -585,6 +609,11 @@ namespace Tavla.View
             if (_configureCamera)
                 BoardSceneBuilder.ConfigureCamera(_layout, _cameraBackgroundColor);
 
+            _hitEffects = new HitEffects(BoardSceneBuilder.AddCameraShake(_layout), _hitShake, _blastShake,
+                                         _breakFrameTime, FindCheckerView, GetBreakFrames);
+            _hitEffects.ShakeEnabled = _screenShake;
+            _hitEffects.BreaksEnabled = _checkerBreaks;
+
             if (_backgroundSprite != null)
                 BoardSceneBuilder.SpawnCanvasLayer("ScreenBackground", _backgroundSprite, SortingOrders.ScreenBackground);
 
@@ -723,6 +752,19 @@ namespace Tavla.View
             return special ?? _playerCheckers;
         }
 
+        /// <summary>How a hit checker breaks apart: its skin's frames. Empty for a skin without break art.</summary>
+        private Sprite[] GetBreakFrames(BaseChecker model)
+        {
+            return GetSkin(model).Break;
+        }
+
+        /// <summary>The checker's scene representative; null if it has none.</summary>
+        private CheckerController FindCheckerView(BaseChecker model)
+        {
+            CheckerController view;
+            return _checkerViews.TryGetValue(model, out view) ? view : null;
+        }
+
         /// <summary>
         /// Builds the checker object in code when there is no prefab. Removes the prefab authoring step
         /// from the editor entirely — all that is needed is the sprite field in the Inspector.
@@ -750,6 +792,10 @@ namespace Tavla.View
         {
             // First, so the log reads in the order things happen (see BoardEventLog).
             _eventLog.Attach(_gameState, _context);
+
+            // Before the listeners below: it must see a destroyed checker's visual before HandleCheckerDestroyed lets it go.
+            if (_hitEffects != null)
+                _hitEffects.Attach(_gameState);
 
             _gameState.MoveExecuted += HandleMoveExecuted;
             _gameState.MoveRejected += HandleMoveRejected;
@@ -827,6 +873,10 @@ namespace Tavla.View
         private void Unsubscribe()
         {
             _eventLog.Detach();
+
+            // Also clears its breaks away and brings back the checkers it had switched off.
+            if (_hitEffects != null)
+                _hitEffects.Detach();
 
             if (_gameState != null)
             {
@@ -975,6 +1025,13 @@ namespace Tavla.View
         {
             if (_gameState != null && WasEndTurnPressed())
                 EndTurn();
+        }
+
+        private void LateUpdate()
+        {
+            // After the frame's moves and the checkers' glide, so a capturer that has just come to rest is seen landed.
+            if (_hitEffects != null)
+                _hitEffects.Tick(Time.deltaTime);
         }
 
         private bool WasEndTurnPressed()
@@ -1150,7 +1207,7 @@ namespace Tavla.View
             if (_hud != null)
             {
                 if (aiming)
-                    _hud.SetTask(string.Format(_volleyTask, _gameState.PendingVolleySize - _volleyPicks.Count));
+                    _hud.SetStatus(string.Format(_volleyTask, _gameState.PendingVolleySize - _volleyPicks.Count));
                 else if (_showingVolleyTask && !_gameState.IsMatchOver) // A finished match shows its result there.
                     _hud.RefreshAll();
             }

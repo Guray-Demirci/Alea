@@ -81,6 +81,15 @@ namespace Tavla.Core.Run
             }
         }
 
+        /// <summary>
+        /// What a checker bought for <paramref name="purchasePrice"/> sells back for: half, rounded down, yet at
+        /// least 1 gold for anything that cost gold. A free checker sells for nothing.
+        /// </summary>
+        public static int GetSellPrice(int purchasePrice)
+        {
+            return purchasePrice > 0 ? Math.Max(1, purchasePrice / 2) : 0;
+        }
+
         private static int[] Copy(IReadOnlyList<int> prices, string paramName)
         {
             int[] copy = new int[prices.Count];

@@ -16,11 +16,11 @@ namespace Tavla.View
         /// <summary>The player's gold.</summary>
         Gold,
 
-        /// <summary>Remaining moves (dice) of the current turn.</summary>
-        Moves,
+        /// <summary>The match's task: the score the player must reach. The dice are shown by the dice cards.</summary>
+        Target,
 
-        /// <summary>Task/status line. Shows the remaining turns by default.</summary>
-        Task
+        /// <summary>Status line. Shows the remaining turns by default.</summary>
+        Status
     }
 
     /// <summary>
@@ -106,11 +106,11 @@ namespace Tavla.View
         [SerializeField]
         private HudSlot[] _slots =
         {
-            // The clean parchment of the four strips, top to bottom: task, score, moves, gold.
-            new HudSlot { Field = HudField.Score, Box = new RectInt(20, 91, 40, 9),  Caption = "SCORE" },
-            new HudSlot { Field = HudField.Gold,  Box = new RectInt(20, 130, 40, 9), Caption = "GOLD" },
-            new HudSlot { Field = HudField.Moves, Box = new RectInt(20, 111, 40, 9), Caption = "MOVE" },
-            new HudSlot { Field = HudField.Task,  Box = new RectInt(20, 71, 40, 9),  Caption = "TASK" }
+            // The clean parchment of the four strips, top to bottom: status, score, target, gold.
+            new HudSlot { Field = HudField.Score,  Box = new RectInt(20, 91, 40, 9),  Caption = "SCORE" },
+            new HudSlot { Field = HudField.Gold,   Box = new RectInt(20, 130, 40, 9), Caption = "GOLD" },
+            new HudSlot { Field = HudField.Target, Box = new RectInt(20, 111, 40, 9), Caption = "TASK" },
+            new HudSlot { Field = HudField.Status, Box = new RectInt(20, 71, 40, 9),  Caption = "TURN" }
         };
 
         [Tooltip("Pixel distance between the caption/value and the box edges.")]
@@ -286,8 +286,8 @@ namespace Tavla.View
 
         /// <summary>
         /// Hides the caption if caption and value do not fit side by side. The value is the real information;
-        /// the caption only reminds what the bar is. For long texts such as "6 6 6 6" on a double or the
-        /// match result, the box is left to the value; the caption returns once the value gets shorter.
+        /// the caption only reminds what the bar is. For long texts such as "TURN 5" or the match result,
+        /// the box is left to the value; the caption returns once the value gets shorter.
         /// </summary>
         private void FitCaption(SlotLabels labels)
         {

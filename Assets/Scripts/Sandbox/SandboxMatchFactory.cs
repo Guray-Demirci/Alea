@@ -47,7 +47,7 @@ namespace Tavla.Sandbox
 
             MatchRules rules = setup.TargetScore > 0
                 ? MatchRules.ForTarget(setup.TargetScore, setup.TurnLimit, setup.FinalStretchTurns, PlayerId)
-                : MatchRules.Classic(setup.TurnLimit);
+                : MatchRules.Classic(setup.TurnLimit, PlayerId);
 
             GameState board = new GameState(rules);
             SystemRandomProvider random = new SystemRandomProvider(seed);

@@ -13,6 +13,7 @@ namespace Tavla.View
         Dungeon = 4,
         SpikePit = 5,
         PowderKeg = 6,
-        PlunderCove = 7
+        PlunderCove = 7,
+        Graveyard = 8
     }
 }

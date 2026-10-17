@@ -72,7 +72,8 @@ namespace Tavla.Core.Run
         /// The checkers the player fields in every match; where they start is dealt anew by <see cref="StartingLayout"/>.
         /// Starts with <see cref="RunDefinition.StartingCheckers"/> default checkers. <see cref="AddToDeck"/> adds to it;
         /// a checker lost for good — sacrificed for its ability (Second Chance), blown up by a Powder Keg or a captured
-        /// Sacrificial Checker — leaves it when its match ends. A match deals at least <see cref="GameState.MinCheckersPerPlayer"/> checkers a side,
+        /// Sacrificial Checker — leaves it when its match ends, and one sold in the shop (<see cref="Shop.Sell"/>) leaves
+        /// at once. A match deals at least <see cref="GameState.MinCheckersPerPlayer"/> checkers a side,
         /// so plain checkers fill the deck back up to that. It holds at most one of each special checker.
         /// </summary>
         public IReadOnlyList<DeckEntry> Deck => _deck;
@@ -215,6 +216,15 @@ namespace Tavla.Core.Run
         /// </exception>
         public void AddToDeck(CheckerFactory createChecker)
         {
+            AddToDeck(createChecker, 0);
+        }
+
+        /// <summary>
+        /// <see cref="AddToDeck(CheckerFactory)"/> for a checker bought in the shop: the entry remembers the price
+        /// paid, which is what it sells back for half of.
+        /// </summary>
+        internal void AddToDeck(CheckerFactory createChecker, int purchasePrice)
+        {
             if (createChecker == null)
                 throw new ArgumentNullException(nameof(createChecker));
 
@@ -227,12 +237,33 @@ namespace Tavla.Core.Run
                 throw new ArgumentException(
                     $"The factory must return a new checker owned by player {PlayerId}.", nameof(createChecker));
 
-            DeckEntry entry = new DeckEntry(sample.TypeId, createChecker);
+            DeckEntry entry = new DeckEntry(sample.TypeId, createChecker, purchasePrice);
             if (entry.IsSpecial && OwnsChecker(entry.TypeId))
                 throw new InvalidOperationException(
                     $"The deck already holds a {entry.TypeId}: it holds one of each special checker.");
 
             _deck.Add(entry);
+        }
+
+        /// <summary>
+        /// Takes a checker out of the deck — what the shop does with every checker it buys back. Plain checkers
+        /// fill a gap below the fewest a match deals, as when a checker is lost for good.
+        /// </summary>
+        /// <returns>False if the entry was not in the deck.</returns>
+        internal bool RemoveFromDeck(DeckEntry entry)
+        {
+            if (!_deck.Remove(entry))
+                return false;
+
+            FillDeckUp();
+            return true;
+        }
+
+        /// <summary>A side fields at least <see cref="GameState.MinCheckersPerPlayer"/> checkers: plain ones make up the rest.</summary>
+        private void FillDeckUp()
+        {
+            while (_deck.Count < GameState.MinCheckersPerPlayer)
+                _deck.Add(new DeckEntry(DefaultChecker.Id, CreateDefaultChecker));
         }
 
         /// <summary>Does the deck hold a checker of this <see cref="BaseChecker.TypeId"/>?</summary>
@@ -301,6 +332,14 @@ namespace Tavla.Core.Run
                 throw new ArgumentOutOfRangeException(nameof(amount), amount, $"Cannot spend {amount} of {Gold} gold.");
 
             Gold -= amount;
+        }
+
+        internal void EarnGold(int amount)
+        {
+            if (amount < 0)
+                throw new ArgumentOutOfRangeException(nameof(amount), amount, "Cannot earn a negative amount of gold.");
+
+            Gold += amount;
         }
 
         #endregion
@@ -407,8 +446,7 @@ namespace Tavla.Core.Run
             for (int i = 0; i < _lostEntries.Count; i++)
                 _deck.Remove(_lostEntries[i]);
 
-            while (_deck.Count < GameState.MinCheckersPerPlayer)
-                _deck.Add(new DeckEntry(DefaultChecker.Id, CreateDefaultChecker));
+            FillDeckUp();
 
             _lostEntries.Clear();
             _fieldedEntries.Clear();

@@ -19,3 +19,4 @@ MonoBehaviour:
   - {fileID: 21300000, guid: cb53eec609e14f59a5d725bcf4766201, type: 3}
   - {fileID: 21300000, guid: 66e6e301f142470a81153fc315691fc8, type: 3}
   - {fileID: 21300000, guid: 7c3e9a15d4b24f0e8a6d2b9c1f58e0a3, type: 3}
+  _sellButton: {fileID: 21300000, guid: 9c9448b977a140fdbc6ad5eed4149ea6, type: 3}

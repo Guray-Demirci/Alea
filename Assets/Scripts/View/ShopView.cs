@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Tavla.Core.Run;
 
@@ -18,6 +19,12 @@ namespace Tavla.View
     /// The areas below were measured pixel by pixel from the scheme (x right, y DOWN, as in Aseprite). If the artist
     /// moves a shelf or a button, update its entry in <see cref="Areas"/>. The card and charm shelves have no place
     /// on the table yet: Core still stocks them, and every call about them is ignored until the art adds them.
+    ///
+    /// SELLING: the merchant's stall in the bottom right corner, beside the board, is a button (a full canvas, like
+    /// ROLL). It opens a list of the player's checkers in the sunken panel of the frame right above it, one row each
+    /// — the checker on the left with a short text over it, what it sells for on the right, on a dark backing.
+    /// Which checkers are listed, and what clicking one does, is the presenter's business. The stall glows while the
+    /// pointer is on it (<see cref="HoverGlow"/>), so it reads as something to click.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ShopView : MonoBehaviour
@@ -88,12 +95,29 @@ namespace Tavla.View
 
             // ROLL: the next reroll price goes in the tag hanging to the right of the button.
             new Area { Target = ShopTarget.Reroll, Rect = new RectInt(205, 64, 45, 14), Price = new Vector2Int(242, 69) },
-            new Area { Target = ShopTarget.Next, Rect = new RectInt(205, 81, 31, 14) }
+            new Area { Target = ShopTarget.Next, Rect = new RectInt(205, 81, 31, 14) },
+
+            // The stall, on the frame below the sunken panel that holds the sell list.
+            new Area { Target = ShopTarget.Sell, Rect = new RectInt(282, 135, 35, 36) }
         };
 
         // A dark strip under the table for item names and messages; the table has no room for them.
         private static readonly RectInt InfoStrip = new RectInt(117, 142, 124, 9);
         private static readonly Vector2Int InfoAnchor = new Vector2Int(179, 146);
+
+        // The sell list: the bright wood inside the frame's sunken panel above the stall (its shaded rim, x 275-316
+        // and y 36-124, stays visible as a border). Rows run down from the top, each one a clickable box as wide as
+        // the panel. Five rows of 16 px fill it — the deck holds five special checkers at most — and more rows
+        // squeeze closer. The checker's disc (12 px) is centred in its row; x below are pixel boundaries.
+        private static readonly RectInt SellPanel = new RectInt(277, 40, 36, 80);
+        private const int SellRowPitch = 16;
+        private const int SellDiscX = 285;
+        private const int SellPriceX = 302;
+
+        private static readonly Color SellPanelColor = new Color(0f, 0f, 0f, 0.6f);
+
+        // The yellow of the price tags' diamonds: what the checker brings, in gold.
+        private static readonly Color SellPriceColor = new Color32(229, 220, 6, 255);
 
         private static Area SpecialShelf(ShopTarget target, int x, int y)
         {
@@ -116,20 +140,44 @@ namespace Tavla.View
             public PixelLabel Price;
         }
 
+        /// <summary>One row of the sell list. Its root is the row's clickable box, centred on the row.</summary>
+        private sealed class SellSlot
+        {
+            public GameObject Root;
+            public BoxCollider2D Hit;
+            public SpriteRenderer Art;
+            public SpriteRenderer Ring;
+            public PixelLabel Label;
+            public PixelLabel Price;
+        }
+
         // Indexed by ShopTarget; null for a target the table has no place for yet.
         private readonly AreaParts[] _parts = new AreaParts[Enum.GetValues(typeof(ShopTarget)).Length];
+
+        // Made on demand, never destroyed: a row the list no longer needs is only switched off.
+        private readonly List<SellSlot> _sellSlots = new List<SellSlot>();
 
         private ShopArtSet _art;
         private BoardLayout _layout;
         private SpriteRenderer _rollButton;
+        private HoverGlow _sellGlow;
         private PixelLabel _info;
+        private GameObject _sellPanel;
+        private int _sellSlotCount;
         private ShopTarget? _hovered;
+        private int? _hoveredSellSlot;
 
         /// <summary>A shelf or button was clicked.</summary>
         public event Action<ShopTarget> Clicked;
 
         /// <summary>The pointer moved onto a shelf or button; null when it left them all.</summary>
         public event Action<ShopTarget?> HoverChanged;
+
+        /// <summary>A row of the sell list was clicked; the row's index, from the top.</summary>
+        public event Action<int> SellSlotClicked;
+
+        /// <summary>The pointer moved onto a row of the sell list; null when it left them all.</summary>
+        public event Action<int?> SellSlotHoverChanged;
 
         #region Building
 
@@ -156,15 +204,23 @@ namespace Tavla.View
 
             CreateSprite("Table", Vector3.zero, art.Table, SortingOrders.ShopTable);
             _rollButton = CreateSprite("RollButton", Vector3.zero, art.RollButton, SortingOrders.ShopShelf);
+            CreateSprite("SellButton", Vector3.zero, art.SellButton, SortingOrders.ShopShelf);
+            _sellGlow = HoverGlow.Create("SellButtonGlow", transform, art.SellButton, SortingOrders.ShopShelfGlow);
 
             CreateRect("InfoStrip", InfoStrip, solid, InfoStripColor, SortingOrders.ShopInfoStrip);
             _info = CreateLabel("Info", RowAnchor(InfoAnchor), InfoColor, PixelTextSize.Regular);
 
+            _sellPanel = CreateChild("SellPanel", Vector3.zero);
+            CreateRect("Backing", SellPanel, solid, SellPanelColor, SortingOrders.ShopSellPanel, _sellPanel.transform);
+            _sellPanel.SetActive(false);
+
             foreach (Area area in Areas)
             {
-                GameObject hit = CreateChild(area.Target.ToString(), RectCenter(area.Rect));
+                ShopTarget target = area.Target;
+                GameObject hit = CreateChild(target.ToString(), RectCenter(area.Rect));
                 hit.AddComponent<BoxCollider2D>().size = RectSize(area.Rect);
-                hit.AddComponent<ShopHitArea>().Initialize(this, area.Target);
+                hit.AddComponent<ShopHitArea>().Initialize(() => HandleClick(target), () => HandlePointerEnter(target),
+                                                           () => HandlePointerExit(target));
 
                 AreaParts parts = new AreaParts();
 
@@ -187,38 +243,64 @@ namespace Tavla.View
             }
         }
 
-        private GameObject CreateChild(string childName, Vector3 localPosition)
+        /// <param name="parent">Null: the shop's root.</param>
+        private GameObject CreateChild(string childName, Vector3 localPosition, Transform parent = null)
         {
             GameObject go = new GameObject(childName);
-            go.transform.SetParent(transform, false);
+            go.transform.SetParent(parent != null ? parent : transform, false);
             go.transform.localPosition = localPosition;
             return go;
         }
 
         /// <summary>A sprite placed by its pivot. A null sprite draws nothing until one is set.</summary>
-        private SpriteRenderer CreateSprite(string spriteName, Vector3 localPosition, Sprite sprite, int sortingOrder)
+        private SpriteRenderer CreateSprite(string spriteName, Vector3 localPosition, Sprite sprite, int sortingOrder,
+                                            Transform parent = null)
         {
-            SpriteRenderer spriteRenderer = CreateChild(spriteName, localPosition).AddComponent<SpriteRenderer>();
+            SpriteRenderer spriteRenderer = CreateChild(spriteName, localPosition, parent).AddComponent<SpriteRenderer>();
             spriteRenderer.sprite = sprite;
             spriteRenderer.sortingOrder = sortingOrder;
             return spriteRenderer;
         }
 
         /// <summary>A solid rectangle over the given pixel area.</summary>
-        private void CreateRect(string rectName, RectInt rect, Sprite solid, Color color, int sortingOrder)
+        private void CreateRect(string rectName, RectInt rect, Sprite solid, Color color, int sortingOrder,
+                                Transform parent = null)
         {
-            SpriteRenderer rectRenderer = CreateSprite(rectName, RectCenter(rect), solid, sortingOrder);
+            SpriteRenderer rectRenderer = CreateSprite(rectName, RectCenter(rect), solid, sortingOrder, parent);
             Vector2 size = RectSize(rect);
             rectRenderer.transform.localScale = new Vector3(size.x, size.y, 1f);
             rectRenderer.color = color;
         }
 
         /// <summary>A label whose capitals are centred on the given position.</summary>
-        private PixelLabel CreateLabel(string labelName, Vector3 localPosition, Color color, PixelTextSize size)
+        private PixelLabel CreateLabel(string labelName, Vector3 localPosition, Color color, PixelTextSize size,
+                                       Transform parent = null)
         {
-            PixelLabel label = CreateChild(labelName, localPosition).AddComponent<PixelLabel>();
+            PixelLabel label = CreateChild(labelName, localPosition, parent).AddComponent<PixelLabel>();
             label.Configure(_layout.PixelsPerUnit, 0, SortingOrders.ShopText, color, PixelTextAlign.Center, size);
             return label;
+        }
+
+        /// <summary>A new row for the sell list, inside the panel; <see cref="SetSellSlotCount"/> places it.</summary>
+        private SellSlot CreateSellSlot(int index)
+        {
+            SellSlot slot = new SellSlot { Root = CreateChild("SellSlot_" + index, Vector3.zero, _sellPanel.transform) };
+            slot.Hit = slot.Root.AddComponent<BoxCollider2D>();
+            slot.Root.AddComponent<ShopHitArea>().Initialize(() => HandleSellSlotClick(index),
+                                                             () => HandleSellSlotEnter(index),
+                                                             () => HandleSellSlotExit(index));
+
+            // The root sits on the panel's middle column; the disc and the price are offsets from it.
+            float panelMiddle = SellPanel.x + SellPanel.width * 0.5f;
+            Vector3 disc = new Vector3((SellDiscX - panelMiddle) / _layout.PixelsPerUnit, 0f, 0f);
+            Vector3 price = new Vector3((SellPriceX - panelMiddle) / _layout.PixelsPerUnit, 0f, 0f);
+            Transform root = slot.Root.transform;
+
+            slot.Art = CreateSprite("Art", disc, null, SortingOrders.ShopItemArt, root);
+            slot.Ring = CreateSprite("Ring", disc, null, SortingOrders.ShopItemRing, root);
+            slot.Label = CreateLabel("Label", disc, CodeColor, PixelTextSize.Small, root);
+            slot.Price = CreateLabel("Price", price, SellPriceColor, PixelTextSize.Regular, root);
+            return slot;
         }
 
         /// <summary>Where a label anchored on this pixel goes: the left edge of its column, the middle of its row.</summary>
@@ -247,7 +329,11 @@ namespace Tavla.View
 
             // A hidden area never reports the pointer leaving, so forget it here.
             if (!visible)
+            {
                 _hovered = null;
+                _hoveredSellSlot = null;
+                UpdateGlow();
+            }
         }
 
         /// <summary>
@@ -303,29 +389,120 @@ namespace Tavla.View
             return _parts[(int)target];
         }
 
+        /// <summary>Opens or closes the sell list in the panel above the stall.</summary>
+        public void SetSellPanelVisible(bool visible)
+        {
+            _sellPanel.SetActive(visible);
+
+            if (!visible)
+                _hoveredSellSlot = null;
+        }
+
+        /// <summary>
+        /// How many rows the sell list shows, from the top of the panel. Up to five rows keep their full height;
+        /// more squeeze closer so that they all fit.
+        /// </summary>
+        public void SetSellSlotCount(int count)
+        {
+            _sellSlotCount = Mathf.Max(0, count);
+
+            // An even pitch keeps the 12 px disc centred on whole pixels.
+            int pitch = SellRowPitch;
+            if (_sellSlotCount * pitch > SellPanel.height)
+                pitch = Mathf.Max(2, (SellPanel.height / _sellSlotCount) & ~1);
+
+            while (_sellSlots.Count < _sellSlotCount)
+                _sellSlots.Add(CreateSellSlot(_sellSlots.Count));
+
+            for (int i = 0; i < _sellSlots.Count; i++)
+            {
+                SellSlot slot = _sellSlots[i];
+                bool shown = i < _sellSlotCount;
+                slot.Root.SetActive(shown);
+
+                if (!shown)
+                    continue;
+
+                int top = SellPanel.y + i * pitch;
+                slot.Root.transform.localPosition =
+                    _layout.PixelToWorld(SellPanel.x + SellPanel.width * 0.5f, top + pitch * 0.5f);
+                slot.Hit.size = new Vector2(SellPanel.width, pitch) / _layout.PixelsPerUnit;
+            }
+
+            // A row switched off never reports the pointer leaving.
+            if (_hoveredSellSlot >= _sellSlotCount)
+                _hoveredSellSlot = null;
+        }
+
+        /// <summary>
+        /// One row of the sell list: the checker's art, a short text over its disc (a code for a checker without
+        /// art, or how many there are; empty for none), what it sells for, and the ring drawn around it (null for none).
+        /// </summary>
+        public void SetSellSlot(int index, Sprite art, string label, string price, Sprite ring)
+        {
+            if (index < 0 || index >= _sellSlotCount)
+                return;
+
+            SellSlot slot = _sellSlots[index];
+            slot.Art.sprite = art;
+            slot.Label.SetText(label);
+            slot.Price.SetText(price);
+            slot.Ring.sprite = ring;
+        }
+
         #endregion
 
-        #region Pointer (called by ShopHitArea)
+        #region Pointer (called by the hit areas)
 
-        internal void HandleClick(ShopTarget target)
+        private void HandleClick(ShopTarget target)
         {
             Clicked?.Invoke(target);
         }
 
-        internal void HandlePointerEnter(ShopTarget target)
+        private void HandlePointerEnter(ShopTarget target)
         {
             _hovered = target;
+            UpdateGlow();
             HoverChanged?.Invoke(target);
         }
 
-        internal void HandlePointerExit(ShopTarget target)
+        private void HandlePointerExit(ShopTarget target)
         {
             // Moving straight from one area to the next may deliver the new Enter before the old Exit.
             if (_hovered != target)
                 return;
 
             _hovered = null;
+            UpdateGlow();
             HoverChanged?.Invoke(null);
+        }
+
+        /// <summary>The stall glows while the pointer is on it.</summary>
+        private void UpdateGlow()
+        {
+            if (_sellGlow != null)
+                _sellGlow.SetShown(_hovered == ShopTarget.Sell);
+        }
+
+        private void HandleSellSlotClick(int index)
+        {
+            SellSlotClicked?.Invoke(index);
+        }
+
+        private void HandleSellSlotEnter(int index)
+        {
+            _hoveredSellSlot = index;
+            SellSlotHoverChanged?.Invoke(index);
+        }
+
+        private void HandleSellSlotExit(int index)
+        {
+            // The rows touch, so the next row's Enter may come before this one's Exit.
+            if (_hoveredSellSlot != index)
+                return;
+
+            _hoveredSellSlot = null;
+            SellSlotHoverChanged?.Invoke(null);
         }
 
         #endregion

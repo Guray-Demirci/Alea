@@ -182,6 +182,142 @@ namespace Tavla.Core.Tests
             Assert.AreEqual(0, context.GetScore(0));
         }
 
+        // The Graveyard tests play as player 0, the default player of a Classic match; player 1 is the opponent.
+
+        [Test]
+        public void Graveyard_TheOpponentsCapturedChecker_RestartsOnItInsteadOfTheBar()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(12, new GraveyardTile());
+            TestBoard.PlaceDefault(state, 0, 0);
+            DefaultChecker victim = TestBoard.PlaceDefault(state, 3, 1);
+            TestBoard.PlaceDefault(state, 20, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            List<CaptureDestination> destinations = new List<CaptureDestination>();
+            List<string> abilities = new List<string>();
+            state.CheckerCaptured += (checker, point, destination) => destinations.Add(destination);
+            state.AbilityTriggered += (id, checker, point) => abilities.Add(id);
+
+            Assert.IsTrue(state.TryMove(0, 3));
+
+            Assert.AreEqual(0, state.GetBarCount(1));
+            Assert.AreEqual(12, state.FindNodeIndexOf(victim));
+            CollectionAssert.AreEqual(new[] { CaptureDestination.Graveyard }, destinations);
+            CollectionAssert.Contains(abilities, AbilityIds.GraveyardRise);
+            Assert.AreEqual(GameState.CaptureScore, context.GetScore(0), "The capture still scores.");
+        }
+
+        [Test]
+        public void Graveyard_ThePlayersCapturedChecker_StillGoesToTheBar()
+        {
+            // Player 1 is the player here, so the checker player 0 breaks is the player's.
+            MatchContext context;
+            GameState state = TestBoard.CreateWithRules(MatchRules.Classic(GameState.DefaultTurnLimit, 1), out context);
+            state.PlaceTile(12, new GraveyardTile());
+            TestBoard.PlaceDefault(state, 0, 0);
+            TestBoard.PlaceDefault(state, 3, 1);
+            TestBoard.PlaceDefault(state, 20, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            Assert.IsTrue(state.TryMove(0, 3));
+
+            Assert.AreEqual(1, state.GetBarCount(1));
+            Assert.AreEqual(0, state.Nodes[12].CheckerCount);
+        }
+
+        [Test]
+        public void Graveyard_ALoneCheckerOfThePlayersOnIt_IsBrokenByTheCheckerRisingThere()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(12, new GraveyardTile());
+            TestBoard.PlaceDefault(state, 0, 0);
+            DefaultChecker sitter = TestBoard.PlaceDefault(state, 12, 0);
+            DefaultChecker victim = TestBoard.PlaceDefault(state, 3, 1);
+            TestBoard.PlaceDefault(state, 20, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            Assert.IsTrue(state.TryMove(0, 3));
+
+            Assert.AreEqual(12, state.FindNodeIndexOf(victim));
+            Assert.AreEqual(GameState.BarIndex, state.FindNodeIndexOf(sitter), "The player's checker never rises there.");
+            Assert.AreEqual(1, state.Nodes[12].CheckerCount);
+            Assert.AreEqual(GameState.CaptureScore, context.GetScore(1), "The rising checker's side scores its capture.");
+        }
+
+        [Test]
+        public void Graveyard_ThePlayersMadePointOnIt_SendsTheCheckerToTheBar()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(12, new GraveyardTile());
+            TestBoard.PlaceDefault(state, 0, 0);
+            TestBoard.PlaceDefault(state, 12, 0);
+            TestBoard.PlaceDefault(state, 12, 0);
+            TestBoard.PlaceDefault(state, 3, 1);
+            TestBoard.PlaceDefault(state, 20, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            Assert.IsTrue(state.TryMove(0, 3));
+
+            Assert.AreEqual(1, state.GetBarCount(1));
+            Assert.AreEqual(2, state.Nodes[12].CheckerCount);
+        }
+
+        [Test]
+        public void Graveyard_FullOfTheOpponentsCheckers_SendsTheCheckerToTheBar()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(12, new GraveyardTile());
+            TestBoard.PlaceDefault(state, 0, 0);
+            for (int i = 0; i < GameState.StackLimit; i++)
+                TestBoard.PlaceDefault(state, 12, 1);
+            TestBoard.PlaceDefault(state, 3, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            Assert.IsTrue(state.TryMove(0, 3));
+
+            Assert.AreEqual(1, state.GetBarCount(1));
+            Assert.AreEqual(GameState.StackLimit, state.Nodes[12].CheckerCount);
+        }
+
+        [Test]
+        public void Graveyard_ACheckerBrokenOnTheGraveyardItself_GoesToTheBar()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(12, new GraveyardTile());
+            DefaultChecker capturer = TestBoard.PlaceDefault(state, 9, 0);
+            TestBoard.PlaceDefault(state, 12, 1);
+            TestBoard.PlaceDefault(state, 20, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            Assert.IsTrue(state.TryMove(9, 12));
+
+            Assert.AreEqual(1, state.GetBarCount(1));
+            Assert.AreEqual(12, state.FindNodeIndexOf(capturer));
+        }
+
+        [Test]
+        public void Graveyard_LeavesAReckless_ToTheBar()
+        {
+            MatchContext context;
+            GameState state = TestBoard.CreateEmpty(out context);
+            state.PlaceTile(12, new GraveyardTile());
+            TestBoard.PlaceDefault(state, 0, 0);
+            TestBoard.Place(state, 3, new RecklessChecker(1));
+            TestBoard.PlaceDefault(state, 20, 1);
+            TestBoard.SetDice(context, 3, 5);
+
+            Assert.IsTrue(state.TryMove(0, 3));
+
+            Assert.AreEqual(1, state.GetBarCount(1));
+            Assert.AreEqual(0, state.Nodes[12].CheckerCount);
+        }
+
         [Test]
         public void Swamp_OnTheTurnTheCheckerSank_ItCanNeitherLeaveNorBeFreed()
         {

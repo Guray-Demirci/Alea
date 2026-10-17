@@ -4,7 +4,7 @@ namespace Tavla.Core.Checkers
 {
     /// <summary>
     /// Reckless Checker. "None of the penalties of the special tiles affect it."
-    /// Swamp, Fog, Maelstrom, Toll Booth, Dungeon, Spike Pit, Powder Keg and Plunder Cove all leave it alone —
+    /// Swamp, Fog, Maelstrom, Toll Booth, Dungeon, Spike Pit, Powder Keg, Plunder Cove and Graveyard all leave it alone —
     /// without any of them knowing this class (see <see cref="BaseChecker.IsAffectedByTiles"/>).
     /// </summary>
     public class RecklessChecker : SpecialChecker, ITileImmunity

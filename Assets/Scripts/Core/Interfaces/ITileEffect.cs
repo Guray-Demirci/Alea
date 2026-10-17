@@ -23,6 +23,7 @@ namespace Tavla.Core.Interfaces
     ///   <see cref="ICountdownTile"/>    -> Powder Keg (the View shows its count)
     ///   <see cref="IOpenCloseTile"/>    -> Dungeon (the View shows it open or closed)
     ///   <see cref="IScoreSeizingTile"/> -> Plunder Cove (captures and bear-offs on the point score nothing)
+    ///   <see cref="IRestartPointTile"/> -> Graveyard (the opponent's captured checkers restart there, not on the bar)
     ///
     /// A checker immune to tiles (Reckless) never reaches the per-checker hooks: GameState filters it out through
     /// <see cref="BaseChecker.IsAffectedByTiles"/>. Only a hook that walks the point's checkers itself

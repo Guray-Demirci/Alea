@@ -39,9 +39,53 @@ namespace Tavla.View.Tests
         }
 
         [Test]
+        public void CheckerArt_BreaksEverySpecialChecker_WithFramesTwoToSixOfItsOwnFile()
+        {
+            CheckerArtSet art = Load<CheckerArtSet>(CheckerArtPath);
+            HashSet<string> files = new HashSet<string>();
+
+            foreach (CheckerKind kind in (CheckerKind[])Enum.GetValues(typeof(CheckerKind)))
+            {
+                Sprite[] frames = art.GetSkin(CheckerCatalog.GetTypeId(kind)).Break;
+                Assert.AreEqual(5, frames.Length, $"{kind} break frames in {CheckerArtPath}");
+
+                string file = null;
+                for (int i = 0; i < frames.Length; i++)
+                {
+                    Assert.IsNotNull(frames[i], $"{kind} break frame {i}");
+
+                    string path = AssetDatabase.GetAssetPath(frames[i]);
+                    string suffix = $"_{i + 2}.png";
+                    StringAssert.StartsWith("Assets/Sprites/Checkers/Breaks/", path);
+                    StringAssert.EndsWith(suffix, path);
+
+                    // All five from one artist's file, and no other checker's.
+                    string own = path.Substring(0, path.Length - suffix.Length);
+                    if (file == null)
+                        Assert.IsTrue(files.Add(own), $"{kind} breaks like another checker: {own}");
+                    else
+                        Assert.AreEqual(file, own, $"{kind} break frame {i}");
+                    file = own;
+
+                    // Cut square around the 12x12 disc, pivot on its centre like the resting art, at the board's scale.
+                    Assert.AreEqual(12f, frames[i].pixelsPerUnit, path);
+                    Assert.AreEqual(new Vector2(16f, 16f), frames[i].rect.size, path);
+                    Assert.AreEqual(new Vector2(8f, 8f), frames[i].pivot, path);
+                }
+            }
+        }
+
+        [Test]
         public void ShopArt_HasEverySprite()
         {
             Assert.IsTrue(Load<ShopArtSet>(ShopArtPath).IsComplete);
+        }
+
+        [Test]
+        public void ShopArt_TheStallsTexture_IsReadable_ForItsHoverGlow()
+        {
+            Assert.IsTrue(Load<ShopArtSet>(ShopArtPath).SellButton.texture.isReadable,
+                          "Tick Read/Write on the stall's sprite, or it does not glow on hover.");
         }
 
         [Test]
@@ -163,6 +207,29 @@ namespace Tavla.View.Tests
             Assert.AreEqual("KorsanKoyu", art.GetSprite(cove).name);
             Assert.AreEqual(6, art.GetTransition(cove, true).Count, "BeyazdanKorsanKoyuAnimasyon frames 2-7.");
             Assert.AreEqual(6, art.GetTransition(cove, false).Count, "SiyahtanKorsanKoyuAnimasyon frames 2-7.");
+        }
+
+        [Test]
+        public void TileArt_HasTheTollBooth_WithBothTransitions()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string tollBooth = TileCatalog.GetEffectId(TileKind.TollBooth);
+
+            // Shorter than the others: 7 frames, so only 5 in between.
+            Assert.AreEqual("VergiHanesi", art.GetSprite(tollBooth).name);
+            Assert.AreEqual(5, art.GetTransition(tollBooth, true).Count, "BeyazdanVergiHanesiAnimasyon frames 2-6.");
+            Assert.AreEqual(5, art.GetTransition(tollBooth, false).Count, "SiyahtanVergiHanesiAnimasyon frames 2-6.");
+        }
+
+        [Test]
+        public void TileArt_HasTheGraveyard_WithBothTransitions()
+        {
+            TileArtSet art = Load<TileArtSet>(TileArtPath);
+            string graveyard = TileCatalog.GetEffectId(TileKind.Graveyard);
+
+            Assert.AreEqual("Mezarlık Hanesi", art.GetSprite(graveyard).name);
+            Assert.AreEqual(6, art.GetTransition(graveyard, true).Count, "BeyazdanMezarlıkHanesiAnimasyon frames 2-7.");
+            Assert.AreEqual(6, art.GetTransition(graveyard, false).Count, "SiyahtanMezarlıkHanesiAnimasyon frames 2-7.");
         }
 
         [Test]

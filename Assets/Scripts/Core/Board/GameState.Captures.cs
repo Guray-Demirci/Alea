@@ -200,6 +200,12 @@ namespace Tavla.Core.Board
             if (convert != null)
                 destination = CaptureDestination.Converted;
 
+            // Graveyard: an opponent's checker still bound for the bar restarts on the Graveyard instead, if it takes it.
+            BaseChecker graveHit = null;
+            int graveIndex = destination == CaptureDestination.Bar ? FindRestartPoint(victim, node, out graveHit) : InvalidIndex;
+            if (graveIndex != InvalidIndex)
+                destination = CaptureDestination.Graveyard;
+
             // Decision made; the checker is now really leaving the point. If the capture path skipped
             // this hook, the Fog's ability lock would never be released and the checker would return
             // from the bar as a plain checker.
@@ -234,6 +240,11 @@ namespace Tavla.Core.Board
                     ReportAbility(AbilityIds.CaptureConverted, convert, node.Index);
                     break;
 
+                case CaptureDestination.Graveyard:
+                    // It never sits on the bar, so it keeps its abilities, as a Phoenix does.
+                    _nodes[graveIndex].Push(victim);
+                    break;
+
                 default:
                     _bar[victim.OwnerId].Add(victim);
 
@@ -259,6 +270,16 @@ namespace Tavla.Core.Board
 
             CheckerCaptured?.Invoke(victim, node.Index, destination);
 
+            // Graveyard: rising there, the checker breaks the player's lone checker on it, as an entry from the bar would.
+            // No checker of its own made that capture, so none of its abilities shape it. The broken checker is the
+            // player's, so the Graveyard never takes it back: it cannot bounce between the two.
+            if (destination == CaptureDestination.Graveyard)
+            {
+                ReportAbility(AbilityIds.GraveyardRise, victim, graveIndex);
+                if (graveHit != null)
+                    ForceCapture(graveHit, graveIndex, victim.OwnerId);
+            }
+
             // A destroyed or converted checker leaves play for good; it may have been its owner's last one.
             if (destination == CaptureDestination.Destroyed || destination == CaptureDestination.Converted)
                 HandleCheckerLeftPlay(victim.OwnerId);
@@ -283,6 +304,41 @@ namespace Tavla.Core.Board
 
                 if (occupied < StackLimit)
                     return index;
+            }
+
+            return InvalidIndex;
+        }
+
+        /// <summary>
+        /// Graveyard: the point an opponent's captured checker restarts on instead of the bar — the first Graveyard
+        /// (<see cref="IRestartPointTile"/>) on its way round the board that takes it, as a plain checker entering from
+        /// the bar would be taken: not a full point (<see cref="StackLimit"/>), not one the player holds (2+ checkers, a
+        /// lone Armored), and a lone checker of the player's there is broken (<paramref name="hit"/>).
+        /// <see cref="InvalidIndex"/> for the player's own checkers, for a checker immune to tiles (Reckless), and when no
+        /// Graveyard takes it. A checker captured on the Graveyard itself never rises there: its capturer is landing on it.
+        /// </summary>
+        private int FindRestartPoint(BaseChecker victim, Node captureNode, out BaseChecker hit)
+        {
+            hit = null;
+            int owner = victim.OwnerId;
+            if (owner == _rules.ScoringPlayerId || !victim.IsAffectedByTiles)
+                return InvalidIndex;
+
+            int direction = GetDirection(owner);
+            for (int index = GetHomeEntryIndex(owner); IsOnBoard(index); index += direction)
+            {
+                Node point = _nodes[index];
+                if (point == captureNode || !(point.ActiveTile is IRestartPointTile) || point.IsBlockedFor(owner))
+                    continue;
+
+                // Not blocked, so any enemy there is a lone one it can break, which makes room as it leaves.
+                BaseChecker lone = point.CountEnemiesOf(owner) > 0 ? point.GetTopEnemyOf(owner) : null;
+                int staying = point.CheckerCount - (lone != null ? 1 : 0);
+                if (staying + 1 > StackLimit)
+                    continue;
+
+                hit = lone;
+                return index;
             }
 
             return InvalidIndex;

@@ -156,12 +156,24 @@ MonoBehaviour:
     Selected: {fileID: 21300000, guid: 681d2525ad6824e959ca11d68d5c64ea, type: 3}
     MovableRing: {fileID: 0}
     SelectedRing: {fileID: 0}
+    Break:
+    - {fileID: 21300000, guid: 2fff2953dbfefac7213077174c918923, type: 3}
+    - {fileID: 21300000, guid: 97e5e81697a0affe02e375a7960ba315, type: 3}
+    - {fileID: 21300000, guid: 96fd6c3743272360958b5329b7eb54dc, type: 3}
+    - {fileID: 21300000, guid: c5bfe9dd230679e0f50a4e2e0507c3f6, type: 3}
+    - {fileID: 21300000, guid: 12261c2cb2a53b89134f2f88987d5014, type: 3}
   _opponentCheckers:
     Normal: {fileID: 21300000, guid: 5601163739a995dcbcda847d93f21488, type: 3}
     Movable: {fileID: 0}
     Selected: {fileID: 0}
     MovableRing: {fileID: 0}
     SelectedRing: {fileID: 0}
+    Break:
+    - {fileID: 21300000, guid: eefa53f2da334aeab6592e56961f40ba, type: 3}
+    - {fileID: 21300000, guid: 43f8b2f1b04142d99b48907cf6bf29f1, type: 3}
+    - {fileID: 21300000, guid: 6d162fffba18408c9399dc98c0cf313c, type: 3}
+    - {fileID: 21300000, guid: 44233d902140442fb8cc20c05ff2f699, type: 3}
+    - {fileID: 21300000, guid: 6830be813a75493784341f082659c156, type: 3}
   _checkerArt: {fileID: 11400000, guid: 35f960226311ec249dd5db50834dadc8, type: 2}
   _boardSprite: {fileID: 21300000, guid: 0f1e2d3c4b5a69788796a5b4c3d2e1f0, type: 3}
   _backgroundSprite: {fileID: 21300000, guid: c29f4812d1414dd2821f4b2770d75a83, type: 3}
@@ -225,6 +237,15 @@ MonoBehaviour:
     DeckFull: DECK IS FULL
     TooManySpecialCheckers: MAX {0} SPECIAL CHECKERS
     AlreadyOwned: ALREADY OWNED
+    SellButton: SELL A CHECKER
+    SellHint: CLICK A CHECKER TO SELL
+    NothingToSell: NO CHECKERS TO SELL
+    SellPrice: '+{0}G'
+    ExtraChecker: EXTRA CHECKER
+    SellCount: x{0}
+    SellOffer: '{0} +{1}G'
+    SellConfirm: CLICK AGAIN TO SELL +{1}G
+    SoldChecker: SOLD FOR {1}G
     Codes:
     - ItemId: checker_armored
       Code: AR
@@ -364,7 +385,7 @@ MonoBehaviour:
       y: 111
       width: 40
       height: 9
-    Caption: MOVE
+    Caption: TASK
     PixelOffset: {x: 0, y: 0}
     Align: 1
     Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
@@ -374,7 +395,7 @@ MonoBehaviour:
       y: 71
       width: 40
       height: 9
-    Caption: TASK
+    Caption: TURN
     PixelOffset: {x: 0, y: 0}
     Align: 1
     Color: {r: 0.4, g: 0.22352941, b: 0.19215687, a: 1}
@@ -394,7 +415,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Tavla.View::Tavla.View.HudPresenter
   _view: {fileID: 0}
   _playerId: 0
-  _diceSeparator: ' '
   _emptyValue: '-'
   _turnsRemainingPrefix: 'TURN '
   _winText: YOU WIN

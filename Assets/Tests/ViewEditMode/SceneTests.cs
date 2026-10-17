@@ -84,6 +84,55 @@ namespace Tavla.View.Tests
             });
         }
 
+        [TestCase(MainScene)]
+        [TestCase(SandboxScene)]
+        public void Scene_BreaksAHitOpponentChecker_WithFramesTwoToSix(string scenePath)
+        {
+            WithScene(scenePath, scene =>
+            {
+                SerializedObject board = new SerializedObject(FindBoardManager(scene));
+                SerializedProperty frames = board.FindProperty("_opponentCheckers.Break");
+                Assert.IsNotNull(frames, "CheckerSkin has no field Break.");
+                Assert.AreEqual(5, frames.arraySize);
+
+                for (int i = 0; i < frames.arraySize; i++)
+                {
+                    Sprite frame = frames.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
+                    Assert.IsNotNull(frame, $"break frame {i}");
+                    Assert.AreEqual($"Assets/Sprites/RakipTasKırılmaAnimasyon_{i + 2}.png", AssetDatabase.GetAssetPath(frame));
+
+                    // Centred on the 12x12 disc it breaks, at the board's scale.
+                    Assert.AreEqual(12f, frame.pixelsPerUnit, frame.name);
+                    Assert.AreEqual(new Vector2(14f, 14f), frame.rect.size, frame.name);
+                    Assert.AreEqual(new Vector2(7f, 7f), frame.pivot, frame.name);
+                }
+            });
+        }
+
+        [TestCase(MainScene)]
+        [TestCase(SandboxScene)]
+        public void Scene_BreaksAHitPlayerChecker_WithFramesTwoToSix(string scenePath)
+        {
+            WithScene(scenePath, scene =>
+            {
+                SerializedObject board = new SerializedObject(FindBoardManager(scene));
+                SerializedProperty frames = board.FindProperty("_playerCheckers.Break");
+                Assert.AreEqual(5, frames.arraySize);
+
+                for (int i = 0; i < frames.arraySize; i++)
+                {
+                    Sprite frame = frames.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
+                    Assert.IsNotNull(frame, $"break frame {i}");
+                    Assert.AreEqual($"Assets/Sprites/OyuncuTasKırılmaAnimasyon_{i + 2}.png", AssetDatabase.GetAssetPath(frame));
+
+                    // Cut square around the 12x12 disc it breaks, pivot on its centre, at the board's scale.
+                    Assert.AreEqual(12f, frame.pixelsPerUnit, frame.name);
+                    Assert.AreEqual(new Vector2(16f, 16f), frame.rect.size, frame.name);
+                    Assert.AreEqual(new Vector2(8f, 8f), frame.pivot, frame.name);
+                }
+            });
+        }
+
         private static void WithScene(string path, Action<Scene> check)
         {
             Scene open = SceneManager.GetSceneByPath(path);
@@ -113,7 +162,6 @@ namespace Tavla.View.Tests
             Assert.Fail($"{scene.path} has no BoardManager.");
             return null;
         }
-
         private static void AssertReferences(SerializedObject owner, string field, string assetPath)
         {
             SerializedProperty property = owner.FindProperty(field);

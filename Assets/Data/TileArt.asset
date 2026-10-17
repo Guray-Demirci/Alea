@@ -132,4 +132,36 @@ MonoBehaviour:
     - {fileID: 21300000, guid: cd27f6f41196eac7198513e7230a46cf, type: 3}
     - {fileID: 21300000, guid: a70b68f5f8776bd68ec38d40d9a55bb4, type: 3}
     OpenFrame: 0
+  - Tile: 3
+    Point: {fileID: 21300000, guid: f63a03008d8a5e873c2f845acb320fa8, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: 6e443041a215833d0d6b29452381ede8, type: 3}
+    - {fileID: 21300000, guid: 12ecab7dcaeb1383dbc375cd6913f040, type: 3}
+    - {fileID: 21300000, guid: 7a1dbe0dcf40c7731138fee5a4a14f11, type: 3}
+    - {fileID: 21300000, guid: 1d5668a023f133d8ce7ee1a205badfbc, type: 3}
+    - {fileID: 21300000, guid: 652d93955b1be42d89e8622ad3308e3e, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: 6b443faa73a3280d3e48e87cedfeafc9, type: 3}
+    - {fileID: 21300000, guid: a1e1ae3a07083f6d9eca7bfab4d723d2, type: 3}
+    - {fileID: 21300000, guid: 162625088ea01bff85c7150a6176d877, type: 3}
+    - {fileID: 21300000, guid: 26050ba78345cd85491fc268d11fdf22, type: 3}
+    - {fileID: 21300000, guid: 74d0dc90f9c42504232ddbe961ab056e, type: 3}
+    OpenFrame: 0
+  - Tile: 8
+    Point: {fileID: 21300000, guid: 63f3b70ac866744b0f259aa291971650, type: 3}
+    FromLight:
+    - {fileID: 21300000, guid: 9e4686c25a8dda3c3ba8622f7895dc7d, type: 3}
+    - {fileID: 21300000, guid: 0548a73f5a2c98dbe0cb35c97c1ea1d4, type: 3}
+    - {fileID: 21300000, guid: f669c1daa3fde9563c32ad888b6038ec, type: 3}
+    - {fileID: 21300000, guid: a9fc91c097625a34b76cf9b4d2c61695, type: 3}
+    - {fileID: 21300000, guid: 33af444ed7a0140fb16239bf5315ab77, type: 3}
+    - {fileID: 21300000, guid: a56139adde204a184b3b5d91eda0abb4, type: 3}
+    FromDark:
+    - {fileID: 21300000, guid: 689bfc14fb3832d88d8dac0ea17409aa, type: 3}
+    - {fileID: 21300000, guid: d5c4be182d1f9fc40f650d99a8e881d3, type: 3}
+    - {fileID: 21300000, guid: 10b0e322d445f102c1b2d9902a410791, type: 3}
+    - {fileID: 21300000, guid: c179e51f6be52fc85dbd710adab6234f, type: 3}
+    - {fileID: 21300000, guid: 199bdf2d52cf19efd958e739338706e3, type: 3}
+    - {fileID: 21300000, guid: b76c8b253b31ed96fe3ea15f90c5b9ea, type: 3}
+    OpenFrame: 0
   _frameSeconds: 0.1

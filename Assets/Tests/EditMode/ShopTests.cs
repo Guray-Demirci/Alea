@@ -362,6 +362,213 @@ namespace Tavla.Core.Tests
 
         #endregion
 
+        #region Selling
+
+        [Test]
+        public void TheSellPrice_IsHalfThePurchasePrice_RoundedDown_ButAtLeast1()
+        {
+            Assert.AreEqual(5, ShopPrices.GetSellPrice(10));
+            Assert.AreEqual(2, ShopPrices.GetSellPrice(5));
+            Assert.AreEqual(1, ShopPrices.GetSellPrice(1), "Anything that cost gold brings some back.");
+            Assert.AreEqual(0, ShopPrices.GetSellPrice(0), "A free checker brings nothing.");
+        }
+
+        [Test]
+        public void SellingASpecialChecker_PaysHalfItsPrice_AndTakesItOutOfTheDeck()
+        {
+            RunState run = CreateRunInShop(gold: 20);
+            Shop shop = run.ActiveShop;
+            ShopOffer offer = shop.GetOffer(ShopSlot.SpecialChecker1);
+            shop.Buy(ShopSlot.SpecialChecker1);
+            DeckEntry bought = run.Deck[run.Deck.Count - 1];
+            int changes = 0;
+            shop.Changed += () => changes++;
+
+            Assert.AreEqual(offer.Price, bought.PurchasePrice);
+            Assert.AreEqual(offer.Price / 2, shop.GetSellPrice(bought));
+            Assert.AreEqual(SaleResult.Success, shop.Sell(bought));
+
+            Assert.AreEqual(20 - offer.Price + offer.Price / 2, run.Gold);
+            Assert.AreEqual(Starting, run.Deck.Count);
+            Assert.AreEqual(0, run.SpecialCheckerCount);
+            Assert.IsFalse(run.OwnsChecker(offer.Item.CheckerTypeId));
+            Assert.AreEqual(1, changes);
+            Assert.AreEqual(SaleResult.NotInDeck, shop.Sell(bought), "It is sold already.");
+        }
+
+        [Test]
+        public void TheSellPrice_IsHalfOfWhatWasPaid_DiscountIncluded()
+        {
+            RunState run = CreateRun(gold: 50);
+            run.StartMatch().Context.AddShopDiscount(2);
+            WinActiveMatch(run);
+            Shop shop = run.OpenShop();
+            ShopOffer offer = shop.GetOffer(ShopSlot.SpecialChecker1);
+
+            shop.Buy(ShopSlot.SpecialChecker1);
+
+            int paid = TierPrices[offer.Item.Tier - 1] - 2;
+            Assert.AreEqual(paid, run.Deck[run.Deck.Count - 1].PurchasePrice);
+            Assert.AreEqual(paid / 2, shop.GetSellPrice(run.Deck[run.Deck.Count - 1]));
+        }
+
+        [Test]
+        public void TheSpecialCheckers_AreListedForSale_InDeckOrder_ThenTheExtraPlainOnes()
+        {
+            RunState run = CreateRunInShop(gold: 50);
+            Shop shop = run.ActiveShop;
+            shop.Buy(ShopSlot.BasicChecker);
+            shop.Buy(ShopSlot.SpecialChecker1);
+            shop.Buy(ShopSlot.SpecialChecker2);
+            List<DeckEntry> sellable = new List<DeckEntry>();
+
+            shop.GetSellableCheckers(sellable);
+
+            Assert.AreEqual(3, sellable.Count);
+            Assert.AreEqual(shop.GetOffer(ShopSlot.SpecialChecker1).Item.CheckerTypeId, sellable[0].TypeId);
+            Assert.AreEqual(shop.GetOffer(ShopSlot.SpecialChecker2).Item.CheckerTypeId, sellable[1].TypeId);
+            Assert.IsFalse(sellable[2].IsSpecial);
+            Assert.AreEqual(1, shop.ExtraPlainCheckerCount);
+        }
+
+        [Test]
+        public void ThePlainCheckersTheRunStartedWith_CannotBeSold()
+        {
+            RunState run = CreateRunInShop(gold: 50);
+            Shop shop = run.ActiveShop;
+            List<DeckEntry> sellable = new List<DeckEntry>();
+
+            shop.GetSellableCheckers(sellable);
+
+            Assert.AreEqual(0, sellable.Count);
+            Assert.AreEqual(0, shop.ExtraPlainCheckerCount);
+            Assert.AreEqual(SaleResult.NotForSale, shop.Sell(run.Deck[0]));
+            Assert.AreEqual(Starting, run.Deck.Count);
+        }
+
+        [Test]
+        public void ExtraPlainCheckers_SellForHalfTheirPrice_DownToTheOnesTheRunStartedWith()
+        {
+            RunState run = CreateRunInShop(gold: 10);
+            Shop shop = run.ActiveShop;
+            shop.Buy(ShopSlot.BasicChecker);
+            shop.Buy(ShopSlot.BasicChecker);
+            List<DeckEntry> sellable = new List<DeckEntry>();
+
+            for (int i = 0; i < 2; i++)
+            {
+                shop.GetSellableCheckers(sellable);
+                Assert.AreEqual(2 - i, sellable.Count);
+                Assert.AreEqual(BasicPrice / 2, shop.GetSellPrice(sellable[0]));
+                Assert.AreEqual(SaleResult.Success, shop.Sell(sellable[0]), $"Sale {i + 1}");
+            }
+
+            Assert.AreEqual(10 - 2 * BasicPrice + 2 * (BasicPrice / 2), run.Gold);
+            Assert.AreEqual(Starting, run.Deck.Count);
+            Assert.AreEqual(0, shop.ExtraPlainCheckerCount);
+            Assert.AreEqual(SaleResult.NotForSale, shop.Sell(run.Deck[0]), "None to spare any more.");
+        }
+
+        [Test]
+        public void TheExtraPlainChecker_ListedForSale_IsTheDearestOne()
+        {
+            // The bought one is added last, behind the five free ones the run started with.
+            RunState run = CreateRunInShop(gold: 10);
+            Shop shop = run.ActiveShop;
+            shop.Buy(ShopSlot.BasicChecker);
+            List<DeckEntry> sellable = new List<DeckEntry>();
+
+            shop.GetSellableCheckers(sellable);
+
+            Assert.AreEqual(1, sellable.Count);
+            Assert.AreSame(run.Deck[run.Deck.Count - 1], sellable[0]);
+            Assert.AreEqual(BasicPrice, sellable[0].PurchasePrice);
+        }
+
+        [Test]
+        public void Selling_FreesAPlaceUnderTheSpecialCheckerLimit()
+        {
+            RunState run = CreateRunInShop(gold: 50, catalog: Catalog(StandardSpecials(), maxSpecialCheckers: 1));
+            Shop shop = run.ActiveShop;
+            shop.Buy(ShopSlot.SpecialChecker1);
+            Assert.AreEqual(PurchaseResult.TooManySpecialCheckers, shop.CheckPurchase(ShopSlot.SpecialChecker2));
+
+            shop.Sell(run.Deck[run.Deck.Count - 1]);
+
+            Assert.AreEqual(PurchaseResult.Success, shop.Buy(ShopSlot.SpecialChecker2));
+        }
+
+        [Test]
+        public void ASoldChecker_CanBeOfferedAgain_AfterAReroll()
+        {
+            // Four specials for three shelves: once one is sold back, a reroll can bring all four.
+            ShopItem[] specials =
+            {
+                ShopItem.SpecialChecker(1, ownerId => new CatalystChecker(ownerId)),
+                ShopItem.SpecialChecker(2, ownerId => new ArmoredChecker(ownerId)),
+                ShopItem.SpecialChecker(2, ownerId => new NomadChecker(ownerId)),
+                ShopItem.SpecialChecker(3, ownerId => new CloverChecker(ownerId))
+            };
+            RunState run = CreateRunInShop(gold: 100, catalog: Catalog(specials));
+            Shop shop = run.ActiveShop;
+            string sold = ItemOn(shop, ShopSlot.SpecialChecker1);
+            shop.Buy(ShopSlot.SpecialChecker1);
+            shop.Sell(run.Deck[run.Deck.Count - 1]);
+
+            Assert.IsTrue(shop.GetOffer(ShopSlot.SpecialChecker1).IsSold, "The shelves on show stay as they are.");
+
+            shop.Reroll();
+
+            Assert.AreEqual(sold, ItemOn(shop, ShopSlot.SpecialChecker1), "FixedRandom draws the first candidate.");
+        }
+
+        [Test]
+        public void Selling_LeavesTheDeckAtTheFewestCheckersAMatchDeals()
+        {
+            // Two plain checkers blown up: the deck is filled back to the minimum with the Armored in it, so
+            // selling the Armored takes it below the minimum again.
+            RunState run = CreateRun(gold: 0);
+            run.AddToDeck(ownerId => new ArmoredChecker(ownerId));
+            GameState board = run.StartMatch().Board;
+            int destroyed = 0;
+            for (int i = 0; i < GameState.NodeCount && destroyed < 2; i++)
+            {
+                foreach (BaseChecker checker in new List<BaseChecker>(board.Nodes[i].Checkers))
+                {
+                    if (destroyed < 2 && checker is DefaultChecker && checker.OwnerId == run.PlayerId)
+                    {
+                        board.DestroyChecker(checker, i);
+                        destroyed++;
+                    }
+                }
+            }
+
+            WinActiveMatch(run);
+            Assert.AreEqual(Starting, run.Deck.Count);
+
+            Shop shop = run.OpenShop();
+            Assert.AreEqual(SaleResult.Success, shop.Sell(new List<DeckEntry>(run.Deck).Find(entry => entry.IsSpecial)));
+
+            Assert.AreEqual(Starting, run.Deck.Count);
+            Assert.AreEqual(0, run.SpecialCheckerCount);
+            Assert.AreEqual(0, run.Gold, "Given to the deck for free, it sells for nothing.");
+        }
+
+        [Test]
+        public void NothingIsSold_OnceTheShopIsClosed()
+        {
+            RunState run = CreateRunInShop(gold: 20);
+            Shop shop = run.ActiveShop;
+            shop.Buy(ShopSlot.SpecialChecker1);
+            DeckEntry bought = run.Deck[run.Deck.Count - 1];
+            shop.Close();
+
+            Assert.AreEqual(SaleResult.ShopClosed, shop.Sell(bought));
+            Assert.IsTrue(run.OwnsChecker(bought.TypeId));
+        }
+
+        #endregion
+
         #region Rerolling
 
         [Test]
